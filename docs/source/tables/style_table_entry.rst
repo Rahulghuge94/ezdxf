@@ -28,7 +28,7 @@ Example to create a new text style "Arial" and to apply this text style:
 
 .. code-block:: Python
 
-    doc.styles.new("Arial", dxfattribs={"font": "Arial.ttf"})
+    doc.styles.add("Arial", font="Arial.ttf")
     msp = doc.modelspace()
     msp.add_text("my text", dxfattribs={"style": "Arial"})
 
@@ -52,7 +52,7 @@ The most important setting is the :attr:`font` attribute, this attribute
 defines the rendering font as raw TTF file name, e.g. "Arial.ttf" or
 "OpenSansCondensed-Light.ttf", this file name is often **not** the name
 displayed in GUI application and you have to digg down into the fonts folder
-e.g. (``C:\\Windows\\Fonts``) to get the the real file name for the TTF font.
+e.g. ("C:\\Windows\\Fonts") to get the the real file name for the TTF font.
 Do not include the path!
 
 .. image:: ../gfx/font_properties.png
@@ -113,7 +113,7 @@ Factory function         :meth:`Drawing.styles.new`
 
     .. attribute:: dxf.owner
 
-        Handle to owner (:class:`~ezdxf.sections.table.StyleTable`).
+        Handle to owner (:class:`~ezdxf.sections.table.TextstyleTable`).
 
     .. attribute:: dxf.name
 
@@ -180,6 +180,8 @@ Factory function         :meth:`Drawing.styles.new`
     .. automethod:: set_extended_font_data
 
     .. automethod:: discard_extended_font_data
+
+    .. automethod:: make_font
 
 
 .. _DXF Reference: http://help.autodesk.com/view/OARX/2018/ENU/?guid=GUID-EF68AF7C-13EF-45A1-8175-ED6CE66C8FC9

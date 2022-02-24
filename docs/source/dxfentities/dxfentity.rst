@@ -47,7 +47,17 @@ Common base class for all DXF entities and objects.
 
     .. autoproperty:: is_bound
 
+    .. autoproperty:: is_copy
+
     .. autoproperty:: uuid
+
+    .. autoproperty:: source_of_copy
+
+    .. autoproperty:: origin_of_copy
+
+    .. autoproperty:: has_source_block_reference
+
+    .. autoproperty:: source_block_reference
 
     .. automethod:: dxftype
 
@@ -78,6 +88,8 @@ Common base class for all DXF entities and objects.
     .. automethod:: get_extension_dict() -> ExtensionDict
 
     .. automethod:: new_extension_dict() -> ExtensionDict
+
+    .. automethod:: discard_extension_dict
 
     .. automethod:: has_app_data
 

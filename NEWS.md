@@ -2,14 +2,314 @@
 News
 ====
 
-Version 0.16.2 - dev
+Version 0.18b1 - dev
 --------------------
 
-- CHANGED: `ezdxf.path.add_bezier4p()`, add linear Bézier curve segments as LINE_TO commands
-- CHANGED: `ezdxf.path.add_bezier3p()`, add linear Bézier curve segments as LINE_TO commands
+- Release notes: https://ezdxf.mozman.at/release-v0-18.html
+- NEW: angular dimension rendering support, new factory methods:
+  `add_angular_dim_2l()`, `add_angular_dim_3p()`, `add_angular_dim_cra()`, 
+  `add_angular_dim_arc()` 
+- NEW: arc length dimension rendering support, new factory methods: 
+  `add_arc_dim_3p()`, `add_arc_dim_cra()`, `add_arc_dim_arc()`
+- NEW: ordinate dimension rendering support, new factory methods: 
+  `add_ordinate_dim()`, `add_ordinate_x_dim()`, `add_ordinate_y_dim()`
+- NEW: extended query functionality for the `EntityQuery` class
+- NEW: function `ezdxf.tools.text.is_upside_down_text_angle()` in WCS
+- NEW: function `ezdxf.tools.text.upright_text_angle()` in WCS
+- NEW: helper class `ezdxf.math.ConstructionPolyline` to measure, interpolate and 
+  divide polylines and anything that can be approximated or flattened into 
+  vertices
+- NEW: approximation tool for parametrized curves: `ezdxf.math.ApproxParamT()`
+- NEW: `BoundingBox(2d).intersection(other)`, returns the 3D/2D bbox of the intersection space
+- NEW: `BoundingBox(2d).has_intersection(other)` replaces deprecated method `intersect()` 
+- NEW: `BoundingBox(2d).has_overlap(other)` replaces deprecated method `overlap()` 
+- DEPRECATED: method `BoundingBox(2d).intersect()` will be removed in v1.0.0
+- DEPRECATED: method `BoundingBox(2d).overlap()` will be removed in v1.0.0
+- CHANGE: `BoundingBox(2d).is_empty` is `True` for bounding boxes with a size 
+  of 0 in any dimension or has no data
+- NEW: `ezdxf.gfxattribs.GfxAttribs()` class, [docs](https://ezdxf.mozman.at/docs/tools/gfxattribs.html)
+- NEW: `TextEntityAlignment` enum replaces the string based alignment definition
+- NEW: method `Text.get_placement()`, replaces `get_pos()` 
+- NEW: method `Text.set_placement()`, replaces `set_pos()` 
+- NEW: method `Text.get_align_enum()`, replaces `get_align()`
+- NEW: method `Text.set_align_enum()`, replaces `set_align()`
+- NEW: virtual DXF attribute `MText.dxf.text`, adds compatibility to other text 
+  based entities: `TEXT, ATTRIB, ATTDEF`
+- NEW: command `ezdxf info FILE [FILE ...]`, show info and optional stats of DXF files
+- NEW: module `ezdxf.appsettings`, [docs](https://ezdxf.mozman.at/docs/appsettings.html)
+- NEW: module `ezdxf.addons.binpacking`, a simple solution for the bin-packing problem 
+  in 2D and 3D, [docs](https://ezdxf.mozman.at/docs/addons/binpacking.html)
+- NEW: arguments `height` and `rotation`for factory methods `add_text()` and `add_attdef()`
+- NEW: argument `size_inches` in function `ezdxf.addons.drawing.matplotlib.qsave()`
+- CHANGE: keyword only argument `dxfattribs` for factory methods `add_text()` and `add_attdef()`
+- CHANGE: `recover` module - recovered integer and float values are logged as severe errors
+- CHANGE: method `Path.all_lines_to_curve3` replaced by function `path.lines_to_curve3()`
+- CHANGE: method `Path.all_lines_to_curve4` replaced by function `path.lines_to_curve4()`
+- BUGFIX: add missing caret decoding to `fast_plain_mtext()` [#620](https://github.com/mozman/ezdxf/issues/620)
+
+Version 0.17.2 - 2022-01-06
+---------------------------
+
+- NEW: extended binary wheels support
+  - `manylinux2010_x86_64` for Python < 3.10 and `manylinux2014_x86_64` 
+    for Python >= 3.10 
+  - `musllinux_2010_x86_64` for Python < 3.10 and `musllinux_2014_x86_64` 
+    for Python >= 3.10
+  - `manylinux_2014_aarch64` for ARM64 based Linux
+  - `musllinux_2014_aarch64` for ARM64 based Linux
+  - `macosx_11_0_arm64` for Apple silicon
+  - `macosx_10_9_universal2` for Apple silicon & x86
+- NEW: Auditor fixes invalid transparency values
+- NEW: Auditor fixes invalid crease data in `MESH` entities
+- NEW: add `transparency` argument to `LayerTable.add()`
+- NEW: support for transparency `BYLAYER` and `BYBLOCK` for the `drawing` add-on
+- NEW: `Textstyle.make_font()` returns the ezdxf font abstraction
+- NEW: added `dxfattribs` argument to method `Drawing.set_modelspace_vport()`
+- NEW: `ezdxf.math.split_bezier()` function to split Bezier curves of any degree
+- NEW: `ezdxf.math.intersection_line_line_3d()`
+- NEW: `ezdxf.math.intersect_poylines_2d()`
+- NEW: `ezdxf.math.intersect_poylines_3d()`
+- NEW: `ezdxf.math.quadratic_bezier_from_3p()`
+- NEW: `ezdxf.math.cubic_bezier_from_3p()`
+- NEW: `BoundingBox.contains()`, check if a bounding box contains completely 
+  another bounding box
+- NEW: `TextEntityAlignment` enum replaces the string based alignment definition
+- NEW: method `Text.get_placement()`, replaces `get_pos()` 
+- NEW: method `Text.set_placement()`, replaces `set_pos()` 
+- NEW: method `Text.get_align_enum()`, replaces `get_align()`
+- NEW: method `Text.set_align_enum()`, replaces `set_align()`
+- DEPRECATED: method `Text.get_pos()` will be removed in v1.0.0
+- DEPRECATED: method `Text.set_pos()` will be removed in v1.0.0
+- DEPRECATED: method `Text.get_align()` will be removed in v1.0.0
+- DEPRECATED: method `Text.set_align()` will be removed in v1.0.0
+- CHANGE: moved enum `MTextEntityAlignment` to `ezdxf.enums`
+- CHANGE: moved enum `MTextParagraphAlignment` to `ezdxf.enums`
+- CHANGE: moved enum `MTextFlowDirection` to `ezdxf.enums`
+- CHANGE: moved enum `MTextLineAlignment` to `ezdxf.enums`
+- CHANGE: moved enum `MTextStroke` to `ezdxf.enums`
+- CHANGE: moved enum `MTextLineSpacing` to `ezdxf.enums`
+- CHANGE: moved enum `MTextBackgroundColor` to `ezdxf.enums`
+- CHANGE: `Dimstyle.set_tolerance()`: argument `align` as enum `MTextLineAlignment`
+- CHANGE: `DimstyleOverride.set_tolerance()`: argument `align` as enum `MTextLineAlignment`
+- CHANGE: `MeshData.add_edge()` is changed to `MeshData.add_edge_crease()`, 
+  this fixes my misunderstanding of edge and crease data in the `MESH` entity.  
+- BUGFIX [#574](https://github.com/mozman/ezdxf/issues/574):
+  flattening issues in `Path()` and `ConstructionEllipse()` 
+- BUGFIX: `drawing` add-on shows block references in `ACAD_TABLE` at the 
+  correct location
+- BUGFIX [#589](https://github.com/mozman/ezdxf/issues/589):
+  `Polyface.virtual_entities()` yields correct triangle faces
+- BUGFIX: prevent invalid DXF export of the `MESH` entity  
+- PREVIEW: arc length dimension rendering support, new factory methods: 
+  `add_arc_dim_3p()`, `add_arc_dim_cra()`, `add_arc_dim_arc()`
+- PREVIEW: ordinate dimension rendering support, new factory methods: 
+  `add_ordinate_dim()`, `add_ordinate_x_dim()`, `add_ordinate_y_dim()`
+- PREVIEW: `ezdxf.gfxattribs.GfxAttribs()` class, [docs](https://ezdxf.mozman.at/docs/tools/gfxattribs.html)
+- PREVIEW: command `ezdxf info FILE [FILE ...]`, show info and optional stats of DXF files
+- PREVIEW: approximation tool for parametrized curves: `ezdxf.math.ApproxParamT()`
+
+Version 0.17.1 - 2021-11-14
+---------------------------
+
+- CHANGE: using [PySide6](https://pypi.org/project/PySide6/) as Qt binding 
+  if installed, `PyQt5` is still supported as fallback
+- NEW: tracking feature for DXF entity copies, new properties of `DXFEntity`
+  - `source_of_copy` - the immediate source of an entity copy
+  - `origin_of_copy` - the first non virtual source entity of an entity copy
+  - `is_copy` - is `True` if the entity is a copy
+- NEW: source entity tracking for virtual sub-entities for:
+  `POINT`, `LWPOLYLINE`, `POLYLINE`, `LEADER`, `MLINE`, `ACAD_PROXY_ENTITY` 
+- NEW: source block reference tracking for virtual entities created from block 
+  references, new properties of `DXFEntity`
+  - `has_source_block_reference` - is `True` if the virtual entity was created 
+    by a block reference
+  - `source_block_reference` - the immediate source block reference (`INSERT`), 
+    which created the virtual entity, otherwise ``None``
+- NEW: `ezdxf.tools.text_size` module to measure `TEXT` and `MTEXT` entity dimensions
+- CHANGE: `--ltype` arguments of the `draw` command  to `approximate` and `accurate`
+  to be in sync with the `drawing` add-on configuration.
+- CHANGE: `--ltype` arguments of the `view` command  to `approximate` and `accurate`
+  to be in sync with the `drawing` add-on configuration.
+- REMOVE `--scale` argument of the `view` command
+- REMOVE: `PolylinePath.PATH_TYPE`, use `PolylinePath.type` instead
+- REMOVE: `EdgePath.PATH_TYPE`, use `EdgePath.type` instead
+- BUGFIX: invalid XDATA processing in `XData.safe_init()` 
+- BUGFIX: group code 1003 is valid in XDATA section 
+- BUGFIX: fix loading error of `DIMSTYLE` attribute `dimtxsty` 
+- BUGFIX: fix "Next Entity" and "Previous Entity" actions in the `browse` command 
+- BUGFIX: export `MTEXT` entities with column count different than the count of 
+  linked `MTEXT` entities 
+- BUGFIX: fix invalid text rotation for relative text shifting for linear dimensions
+- PREVIEW: angular dimension rendering support, new factory methods: 
+  `add_angular_dim_2l()`, `add_angular_dim_3p()`, `add_angular_dim_cra()` 
+- PREVIEW: helper class `ezdxf.math.ConstructionPolyline` to measure, interpolate and 
+  divide polylines and anything that can be approximated or flattened into 
+  vertices
+
+Version 0.17 - 2021-10-01
+-------------------------
+
+- Release notes: https://ezdxf.mozman.at/release-v0-17.html
+- NEW: column support for MTEXT read and create, but no editing
+- NEW: factory method `BaseLayout.add_mtext_static_columns()`
+- NEW: factory method `BaseLayout.add_mtext_dynamic_manual_height_columns()`
+- NEW: add-on tool `MTextExplode()` to explode MTEXT entities
+  into single line TEXT entities and additional LINE entities to emulate 
+  strokes, requires the `Matplotlib` package
+- NEW: `move_to()` command and multi-path support for the `ezdxf.path.Path` class 
+- NEW: regular `make_path()` support for the HATCH entity, returns a multi-path object  
+- NEW: regular `make_primitive()` support for the HATCH entity  
+- NEW: `text2path.make_path_from_str()` returns a multi-path object  
+- NEW: `text2path.make_path_from_enity()` returns a multi-path object  
+- NEW: `MPOLYGON` load/write/create support
+- NEW: `ezdxf.path.to_mpolygons()` function: Path() to MPOLYGON converter
+- NEW: `ezdxf.path.render_mpolygons()` function: render MPOLYGON entities form paths
+- NEW: store *ezdxf* and custom metadata in DXF files
+- NEW: command `ezdxf browse FILE ...`, PyQt DXF structure browser
+- NEW: `dxf2code` add-on: function `black()` and method `Code.black_code_str()` 
+  returns the code string formatted by [Black](https://pypi.org/project/black/)
+- NEW: `ezdxf.upright` module to flip inverted extrusion vectors, for more 
+  information read the [docs](https://ezdxf.mozman.at/docs/upright.html)  
+- NEW: support for `ACAD_PROXY_ENTITY`
+- NEW: `BaseLayout.add_mtext_static_columns()`
+- NEW: `BaseLayout.add_mtext_dynamic_manual_height_columns()`
+- NEW: rendering support for inline codes in `MTEXT` entities for the `drawing`
+  add-on
+- NEW: `XDATA` transformation support
+- NEW: copy support for extension dictionaries
+- CHANGE: `drawing` add-on: replaced the backend `params` argument (untyped dict) 
+  by the new typed `Configuration` object passed to the frontend class as 
+  argument `config`
+- REMOVED: deprecated class methods `from_...(entity)` from `Path` class, 
+  use `path.make_path(entity)` instead
+- REMOVED: deprecated `Path` methods `add_...(entity)`, 
+  use `path.add_...(path, entity)` function instead
+- BUGFIX: entity query did not match default values if the attribute was not present
+- BUGFIX: groupby query did not match default values if the attribute was not present
+- BUGFIX: ODAFC add-on - reintroduce accidentally removed global variable `exec_path` as `win_exec_path` 
+- BUGFIX: graphic entities are not allowed as `DICTIONARY` entries 
+- BUGFIX: copied `DICTIONARY` was not added to the OBJECTS section by calling `factory.bind()`
+- BUGFIX: `XRecord.copy()` copies content tags
+
+Version 0.16.6 - 2021-08-28
+---------------------------
+
+- NEW: `MPOLYGON` support for the `drawing` add-on
+- NEW: `MPOLYGON` support for the `geo` add-on
+- NEW: `fast` argument for method `MText.plain_text()`
+- NEW: support for multi-line `ATTRIB` and `ATTDEF` entities in DXF R2018 
+- NEW: `Auditor` removes invalid DXF entities from layouts, blocks and the 
+  OBJECTS section
+- NEW: `Auditor` removes standalone ATTRIB entities from layouts and blocks
+- NEW: `Drawing.layers.add()` factory method to create new layers
+- NEW: `Drawing.styles.add()` factory method to create new text styles
+- NEW: `Drawing.linetypes.add()` factory method to create new line types
+- CHANGE: renamed `RenderContext.current_layer` to `RenderContext.current_layer_properties` 
+- CHANGE: renamed `RenderContext.current_block_reference` to `RenderContext.current_block_reference_properties` 
+- CHANGE: extended entity validation for `GROUP`
+- REMOVED: `BaseLayout.add_attrib()` factory method to add standalone `ATTRIB` 
+  entities. `ATTRIB` entities cannot exist as standalone entities.
+- BUGFIX: add missing "doc" argument to DXF loaders, DXF version was not 
+  available at loading stage 
+- BUGFIX: DXF export for `ARC_DIMENSION`
+- BUGFIX: `Arc.flattening()` always have to return `Vec3` instances
+- PREVIEW: new features to try out, API may change until official release in v0.17
+- PREVIEW: support for `ACAD_PROXY_ENTITY`
+- PREVIEW: Rendering support for inline codes in `MTEXT` entities for the `drawing` add-on.
+
+Version 0.16.5 - 2021-07-18
+---------------------------
+
+- NEW: hard dependency `typing_extensions`
+- CHANGE: replaced `ezdxf.tools.rgb` by `ezdxf.colors`
+- CHANGE: `options` module renamed to `_options`; this eliminates the confusion 
+  between the `options` module and the global object `ezdxf.options`
+- NEW: config file support, see [docs](https://ezdxf.mozman.at/docs/options.html#config-files)
+- NEW: `ezdxf config` command to manage config files
+- NEW: `ezdxf.path.have_close_control_vertices(a, b)`, test for close control 
+  vertices of two `Path` objects
+- REMOVED: environment variable options, these are config file only options:
+  - `EZDXF_AUTO_LOAD_FONTS`
+  - `EZDXF_FONT_CACHE_DIRECTORY`
+  - `EZDXF_PRESERVE_PROXY_GRAPHICS`
+  - `EZDXF_LOG_UNPROCESSED_TAGS`
+  - `EZDXF_FILTER_INVALID_XDATA_GROUP_CODES`
+- REMOVED: `ezdxf.options.default_text_style`, was not used  
+- REMOVED: `ezdxf.options.auto_load_fonts`, disabling auto load has no advantage
+- REMOVED: `Vector` alias for `Vec3`
+- REMOVED: `get_acis_data()`, `set_acis_data()` and context manager `edit_data()` 
+  from ACIS based entities, use `acis_data` property instead as `List[str]` or 
+  `List[bytes]`  
+- BUGFIX: `Spline.construction_tool()` recognizes start- and end tangents for 
+  B-splines from fit points if defined  
+- PREVIEW: new features to try out, API may change until official release in v0.17
+- PREVIEW: `dxf2code` add-on: function `black()` and method `Code.black_code_str()` 
+  returns the code string formatted by [Black](https://pypi.org/project/black/)
+- PREVIEW: `ezdxf.upright` module to flip inverted extrusion vectors, for more 
+  information read the [docs](https://ezdxf.mozman.at/docs/upright.html)  
+
+Version 0.16.4 - 2021-06-20
+---------------------------
+
+- NEW: `PolylinePath.type` and `EdgePath.type` as `ezdxf.entities.BoundaryPathType` enum 
+- NEW: `LineEdge.type`, `ArcEdge.type`, `EllipseEdge.type` and `SplineEdge.type` 
+  as `ezdxf.entities.EdgeType` enum
+- NEW: `Path.all_lines_to_curve3()`, convert all LINE_TO commands into linear 
+  CURVE3_TO commands  
+- NEW: `Path.all_lines_to_curve4()`, convert all LINE_TO commands into linear 
+  CURVE4_TO commands
+- NEW: create an AppID `EZDXF` when saving a DXF file by *ezdxf*  
+- BUGFIX: loading crash of the PyQt `CADViewer` class
+- BUGFIX: loading `GEODATA` version 1, perhaps data is incorrect, 
+  logged as warning
+- BUGFIX: `HATCH` spline edge from fit points require start- and end tangents
+- BUGFIX: `disassemble.make_primitive()` transform LWPOLYLINE including width 
+  values into WCS
+- BUGFIX: ignore open loops in `HATCH` edge paths 
+- BUGFIX: correct application of the `Dimension.dxf.insert` attribute
+- BUGFIX: fixed incorrect "thickness" transformation of OCS entities
+- BUGFIX: add missing "width" transformation to POLYLINE and LWPOLYLINE
+- BUGFIX: drawing add-on handles the invisible flag for INSERT correct
+- PREVIEW: new features to try out, API may change until official release in v0.17
+- PREVIEW: `move_to()` command and multi-path support for the `ezdxf.path.Path` class 
+- PREVIEW: `MPOLYGON` load/write/create support
+- PREVIEW: store *ezdxf* and custom metadata in DXF files, see [docs](https://ezdxf.mozman.at/docs/drawing/management.html#ezdxf-metadata)
+- PREVIEW: command `ezdxf browse FILE`, PyQt DXF structure browser
+- PREVIEW: command `ezdxf strip FILE [FILE ...]`, remove comment tags (999) and the 
+  THUMBNAILIMAGE section
+
+
+Version 0.16.3 - 2021-05-22
+---------------------------
+
+- NEW: `ezdxf.tools.text.MTextEditor` class, extracted from the `MText` class
+- NEW: `MText.set_bg_color()`, new argument `text_frame` to add a text frame
+- CHANGE: move `MText` constants to `MTextEditor` class
+- CHANGE: move `MText.set_font()` to `MTextEditor.change_font()`
+- CHANGE: move `MText.set_color()` to `MTextEditor.change_color()`
+- CHANGE: move `MText.append_stacked_text()` to `MTextEditor.stacked_text()`
+- BUGFIX: DXF export of GROUP checks for deleted entities
+- BUGFIX: improved virtual DIMENSION handling
+- BUGFIX: DIMENSION transformation also transform the content of the 
+  associated anonymous geometry block content
+- BUGFIX: `drawing` add-on, true color values always override ACI colors
+- BUGFIX: `drawing` add-on, handle SOLID as OCS entity like TRACE
+- BUGFIX/CHANGE: `Vec2/3.__eq__()` (`==` operator) compares 
+  all components with the full floating point precision, use `Vec2/3.isclose()` 
+  to take floating point imprecision into account. 
+  **This is an annoying but necessary change!**
+- CHANGE: new signature for `Vec2/3.isclose(other, *, rel_tol=1e-9, abs_tol=1e-12)`, 
+  new argument `rel_tol`, arguments `rel_tol` and `abs_tol` are keyword only
+
+Version 0.16.2 - 2021-04-21
+---------------------------
+
+- CHANGED: `ezdxf.path.add_bezier4p()`, add linear Bezier curve segments as LINE_TO commands
+- CHANGED: `ezdxf.path.add_bezier3p()`, add linear Bezier curve segments as LINE_TO commands
 - CHANGED: `$FINGERPRINTGUID` matches AutoCAD pattern `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`
 - CHANGED: `$VERSIONGUID` matches AutoCAD pattern `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`
-- BUGFIX: check for degenerated Bézier curves in `have_bezier_curves_g1_continuity()`
+- BUGFIX: check for degenerated Bezier curves in `have_bezier_curves_g1_continuity()`
+- BUGFIX: delete and unlink support for DXFTagStorage (unsupported entities)
 
 Version 0.16.1 - 2021-04-10
 ---------------------------
@@ -371,7 +671,7 @@ Version 0.13 - 2020-07-04
 - NEW: `Spline.from_arc()`, create a new SPLINE entity from CIRCLE, ARC or ELLIPSE entity (constructor)
 - NEW: `Hatch.set_pattern_scale()` to set scaling of pattern definition
 - NEW: `Hatch.set_pattern_angle()` to set rotation angle of pattern definition
-- NEW: `Hatch.paths.polyline_to_edge_path()` convert polyline paths with bulge values to edge paths with lines and arcs
+- NEW: `Hatch.paths.polyline_to_edge_paths()` convert polyline paths with bulge values to edge paths with lines and arcs
 - NEW: `Hatch.paths.arc_edges_to_ellipse_edges()` convert arc edges to ellipse edges
 - NEW: `Hatch.paths.ellipse_edges_to_spline_edges()` convert ellipse edges to spline edges
 - NEW: `Hatch.paths.all_to_spline_edges()` convert all curves to approximated spline edges

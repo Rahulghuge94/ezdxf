@@ -6,6 +6,7 @@
 DXFResearch
 build
 dist
+venv
 src/ezdxf.egg-info
 docs/build
 tools/plotstyles
@@ -13,8 +14,6 @@ tools/ltype/
 __pycache__
 
 examples/**/*.dxf
-issues/**/*.dxf
-issues/**/*.html
 newctb.ctb
 makefile
 tox.ini
@@ -26,3 +25,15 @@ tox-all.ini
 /examples_dxf/points_pdmode_*.dxf
 /examples_dxf/linetypes_*.dxf
 /examples_dxf/hatch_*.dxf
+/examples_dxf/insert_nesting_level_0.dxf
+/examples_dxf/insert_nesting_level_1.dxf
+/examples_dxf/mtext_simple_all_alignments.dxf
+/src/ezdxf/acc/bezier3p.cpp
+/src/ezdxf/acc/bezier4p.cpp
+/src/ezdxf/acc/bspline.cpp
+/src/ezdxf/acc/construct.cpp
+/src/ezdxf/acc/matrix44.cpp
+/src/ezdxf/acc/vector.cpp
+/src/ezdxf/acc/*.so
+/src/ezdxf/acc/*.pyd
+/src/mypy-reports/

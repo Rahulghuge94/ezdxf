@@ -67,101 +67,59 @@ Simplified render workflow but with less control:
     if not auditor.has_errors:
         matplotlib.qsave(doc.modelspace(), 'your.png')
 
-.. autofunction:: ezdxf.addons.drawing.matplotlib.qsave
+.. autofunction:: ezdxf.addons.drawing.matplotlib.qsave(layout: Layout, filename: str, *, bg: Color = None, fg: Color = None, dpi: int = 300, size_inches: Tuple[float, float]=None, backend: str = "agg", config: Configuration = None, filter_func: FilterFunc = None) -> None
 
 MatplotlibBackend
 -----------------
 
 .. class:: ezdxf.addons.drawing.matplotlib.MatplotlibBackend
 
-    .. method:: __init__(ax: plt.Axes, *, adjust_figure: bool = True, font: FontProperties,  use_text_cache: bool = True, params: Dict = None)
+    .. method:: __init__(ax: plt.Axes, *, adjust_figure: bool = True, font: FontProperties,  use_text_cache: bool = True)
+
 
 PyQtBackend
 -----------
 
 .. class:: ezdxf.addons.drawing.pyqt.PyQtBackend
 
-    .. method:: __init__(scene: qw.QGraphicsScene = None, *, use_text_cache: bool = True, debug_draw_rect: bool = False, params: Dict = None)
+    .. method:: __init__(scene: qw.QGraphicsScene = None, *, use_text_cache: bool = True, debug_draw_rect: bool = False)
 
-Backend Options `params`
-------------------------
+Configuration
+-------------
 
-Additional options for a backend can be passed by the `params` argument of the
-backend constructor :meth:`__init__()`. Not every option will be supported by
-all backends and currently most options are only supported by the Matplotlib
-backend.
+Additional options for the drawing add-on can be passed by the `config`
+argument of the :class:`Frontend` constructor :meth:`__init__()`. Not every
+option will be supported by all backends.
 
+.. autoclass:: ezdxf.addons.drawing.config.Configuration()
 
-pdsize
-    size for the POINT entity:
+    .. method:: defaults()
 
-    - 0 for 5% of draw area height
-    - < 0 specifies a percentage of the viewport size
-    - > 0 specifies an absolute size
+        Returns a frozen :class:`Configuration` object with default values.
 
+    .. method:: with_changes()
 
-pdmode
-    see :class:`~ezdxf.entities.Point` class documentation
+        Returns a new frozen :class:`Configuration` object with modified values.
 
-linetype_renderer
-    - "internal" uses the Matplotlib linetype renderer which is oriented on the
-      output medium and dpi setting, This method is simpler and faster but may
-      not replicate the results of CAD applications.
-    - "ezdxf" replicate AutoCAD linetype rendering oriented on drawing units and
-      various ltscale factors.This rendering method break lines into small
-      segments which causes a longer rendering time!
+        Usage::
 
-linetype_scaling
-    Overall linetype scaling factor. Set to 0 to disable linetype support at
-    all.
+            my_config = Configuration.defaults()
+            my_config = my_config.with_changes(lineweight_scaling=2)
 
-lineweight_scaling
-    Overall lineweight scaling factor. Set to 0 to disable lineweight support
-    at all. The current result is correct, in SVG the line width is 0.7 points
-    for 0.25mm as required, but this often looks too thick.
+LinePolicy
+----------
 
-min_lineweight
-    Minimum lineweight.
+.. autoclass:: ezdxf.addons.drawing.config.LinePolicy
 
-min_dash_length
-    Minimum dash length.
+HatchPolicy
+-----------
 
-max_flattening_distance
-    Maximum flattening distance in drawing units for curve approximations.
+.. autoclass:: ezdxf.addons.drawing.config.HatchPolicy
 
-show_defpoints
-    - 0 to disable defpoints (default)
-    - 1 to show defpoints
+ProxyGraphicPolicy
+------------------
 
-show_hatch
-    - 0 to disable HATCH entities
-    - 1 to show HATCH entities
-
-hatch_pattern
-    - 0 to disable hatch pattern
-    - 1 to use predefined Matplotlib pattern by pattern-name matching, or a
-      simplified pattern in the PyQt backend. The PyQt support for hatch pattern
-      is not good, it is often better to turn hatch pattern support off and
-      disable HATCHES by setting **show_hatch** to 0 or use a solid filling.
-    - 2 to draw HATCH pattern as solid fillings.
-
-Default Values
-++++++++++++++
-
-=========================== ======================= ===================
-Backend Option              MatplotlibBackend       PyQtBackend
-=========================== ======================= ===================
-point_size                  2.0                     1.0
-point_size_relative         ``True``                not supported
-linetype_renderer           "internal"              "internal"
-linetype_scaling            1.0                     1.0
-lineweight_scaling          1.0                     2.0
-min_lineweight              0.24                    0.24
-min_dash_length             0.1                     0.1
-max_flattening_distance     0.01                    0.01
-show_hatch                  1                       1
-hatch_pattern               1                       1
-=========================== ======================= ===================
+.. autoclass:: ezdxf.addons.drawing.config.ProxyGraphicPolicy
 
 Properties
 ----------
@@ -224,29 +182,19 @@ during the development of this add-on.
 Limitations
 -----------
 
-- Line types and hatch patterns/gradients are ignored by the :class:`PyQtBackend`
 - Rich text formatting is ignored (drawn as plain text)
 - If the backend does not match the font then the exact text placement and
   wrapping may appear slightly different
-- No support for MULTILEADER
-- The style which POINT entities are drawn in are not stored in the dxf file and
-  so cannot be replicated exactly
+- MULTILEADER renders only proxy graphic if available
+- relative size of POINT entities cannot be replicated exactly
 - only basic support for:
 
   - infinite lines (rendered as lines with a finite length)
-  - viewports (rendered as rectangles)
-  - 3D (some entities may not display correctly in 3D (see possible improvements below))
-    however many things should already work in 3D.
+  - VIEWPORT and OLE2FRAME entities (rendered as rectangles)
+  - 3D entities are projected into the xy-plane and 3D text is not supported
   - vertical text (will render as horizontal text)
   - multiple columns of text (placement of additional columns may be incorrect)
 
-
-Future Possible Improvements
-----------------------------
-
-- pass the font to backend if available
-- text formatting commands could be interpreted and broken into text chunks
-  which can be drawn with a single font weight or modification such as italics
 
 .. _Triangulation: https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf
 .. _MatplotlibHatch: https://matplotlib.org/3.2.1/gallery/shapes_and_collections/hatch_demo.html

@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, Manfred Moitzi
+# Copyright (c) 2018-2021, Manfred Moitzi
 # License: MIT License
 """ ezdxf typing hints
 
@@ -8,16 +8,19 @@ if TYPE_CHECKING:
     from ezdxf.eztypes import DXFTag
 
 """
-from typing import *
+from typing import (
+    TYPE_CHECKING, List, Union, Sequence, Tuple, Iterable, Hashable, Dict,
+    Callable, Any
+)
 
 if TYPE_CHECKING:
     # Low level stuff
     from ezdxf.math import (
-        Vec3, Vec2, Vertex, VecXY, Matrix44, BoundingBox, BoundingBox2d ,UCS,
-        OCS, Vector
+        Vec3, Vec2, AnyVec, Vertex, Matrix44, BoundingBox, BoundingBox2d, UCS,
+        OCS
     )
     from ezdxf.tools.handle import HandleGenerator
-    from ezdxf.lldxf.types import DXFTag, DXFBinaryTag, DXFVertex
+    from ezdxf.lldxf.types import DXFTag, DXFBinaryTag
     from ezdxf.lldxf.attributes import XType, DXFAttr
     from ezdxf.lldxf.tags import Tags
     from ezdxf.lldxf.extendedtags import ExtendedTags
@@ -38,7 +41,7 @@ if TYPE_CHECKING:
 
     # Sections and Tables
     from ezdxf.sections.table import (
-        Table, ViewportTable, LayerTable, StyleTable
+        Table, ViewportTable, LayerTable, TextstyleTable
     )
     from ezdxf.sections.blocks import BlocksSection
     from ezdxf.sections.header import HeaderSection
@@ -55,7 +58,7 @@ if TYPE_CHECKING:
     from ezdxf.entities.textstyle import Textstyle
     from ezdxf.entities.dimstyle import DimStyle
     from ezdxf.entities.appid import AppID
-    from ezdxf.entities.ucs import UCSTable
+    from ezdxf.entities.ucs import UCSTableEntry
     from ezdxf.entities.view import View
     from ezdxf.entities.vport import VPort
 
@@ -88,7 +91,7 @@ if TYPE_CHECKING:
     from ezdxf.entities.solid import Solid, Trace, Face3d
 
     from ezdxf.entities.subentity import LinkedEntities
-    from ezdxf.entities.polyline import Polyline, Polyface, Polymesh, DXFVertex
+    from ezdxf.entities.polyline import Polyline, Polyface, Polymesh
     from ezdxf.entities.insert import Insert
     from ezdxf.entities.attrib import AttDef, Attrib
     from ezdxf.entities.dimension import Dimension, ArcDimension
@@ -102,6 +105,7 @@ if TYPE_CHECKING:
     from ezdxf.entities.spline import Spline
     from ezdxf.entities.mesh import Mesh
     from ezdxf.entities.hatch import Hatch
+    from ezdxf.entities.mpolygon import MPolygon
     from ezdxf.entities.image import (
         Image, ImageDef, ImageDefReactor, RasterVariables, Wipeout
     )
@@ -119,16 +123,19 @@ if TYPE_CHECKING:
     from ezdxf.entities.geodata import GeoData
     from ezdxf.entities.light import Light
     from ezdxf.entities.leader import Leader
+    from ezdxf.entities.mleader import MultiLeader
     from ezdxf.render.dim_base import BaseDimensionRenderer
     from ezdxf.entities.mline import MLineVertex, MLine, MLineStyle
+    from ezdxf.render.mleader import (
+        MultiLeaderBuilder, MultiLeaderBlockBuilder, MultiLeaderMTextBuilder
+    )
     # other
     from ezdxf.audit import Auditor
     from ezdxf.lldxf.validator import DXFInfo
 
     # Type compositions
-    TagValue = Union[str, bytes, int, float, Sequence[float], Vec3]
     RGB = Tuple[int, int, int]
-    IterableTags = Iterable[Tuple[int, TagValue]]
+    IterableTags = Iterable[Tuple[int, Any]]
     SectionDict = Dict[str, List[Union[Tags, ExtendedTags]]]
     KeyFunc = Callable[['DXFEntity'], Hashable]
     FaceType = Sequence[Vertex]

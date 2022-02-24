@@ -154,21 +154,23 @@ Required DXF version     DXF R2000 (``'AC1015'``)
 
     .. automethod:: set_rotation
 
+    .. automethod:: get_text_direction
+
     .. automethod:: set_bg_color
 
     .. automethod:: __iadd__(text: str) -> MText
 
     .. automethod:: append(text: str) -> MText
 
-    .. automethod:: set_font
-
-    .. automethod:: set_color
-
-    .. automethod:: add_stacked_text
-
     .. automethod:: plain_text
 
+    .. automethod:: all_columns_plain_text
+
+    .. automethod:: all_columns_raw_content
+
     .. automethod:: transform(m: Matrix44) -> MText
+
+    .. automethod:: ucs(m: Matrix44) -> UCS
 
 .. _mtext_inline_codes:
 
@@ -180,18 +182,20 @@ Code    Description
 ======= ===========
 \\L     Start underline
 \\l     Stop underline
-\\O	    Start overstrike
-\\o	    Stop overstrike
+\\O	    Start overline
+\\o	    Stop overline
 \\K	    Start strike-through
 \\k	    Stop strike-through
 \\P	    New paragraph (new line)
-\\pxi   Control codes for bullets, numbered paragraphs and columns
+\\p     Paragraphs properties: indentation, alignment, tabulator stops
 \\X	    Paragraph wrap on the dimension line (only in dimensions)
-\\Q	    Slanting (obliquing) text by angle - e.g. \\Q30;
-\\H     Text height - e.g. \\H3x;
-\\W	    Text width - e.g. \\W0.8x;
+\\Q	    Slanting (oblique) text by angle - e.g. \\Q30;
+\\H     Text height - e.g. relative \\H3x; absolut \\H3;
+\\W	    Text width - e.g. relative \\W0.8x; absolut \\W0.8;
+\\T     Tracking, character spacing - e.g. relative \\T0.5x; absolut \\T2;
 \\F	    Font selection e.g. \\Fgdt;o - GDT-tolerance
-\\S	    Stacking, fractions e.g. \\SA^B or \\SX/Y or \\S1#4
+\\S     Stacking, fractions e.g. \\SA^ B; space after "^" is required to avoid
+        caret decoding, \\SX/Y; \\S1#4;
 \\A     Alignment
 
         - \\A0; = bottom
@@ -208,30 +212,26 @@ Code    Description
         - \\C6; = magenta
         - \\C7; = white
 
-\\T     Tracking, char.spacing - e.g. \\T2;
-\\~     Non-wrapping space, hard space
-{}	    Braces - define the text area influenced by the code, codes and braces can be nested up to 8 levels deep
-\\	    Escape character - e.g. \\{ = "{"
+\\~     Non breaking space
+{}      Braces - define the text area influenced by the code, codes and braces
+        can be nested up to 8 levels deep
+\\      Escape character - e.g. \\{ = "{"
 ======= ===========
 
-Convenient constants defined in MText:
---------------------------------------
+Convenient constants defined in MTextEditor:
+--------------------------------------------
 
 =================== ===========
 Constant            Description
 =================== ===========
-UNDERLINE_START     start underline text (:code:`b += b.UNDERLINE_START`)
-UNDERLINE_STOP      stop underline text (:code:`b += b.UNDERLINE_STOP`)
-UNDERLINE           underline text (:code:`b += b.UNDERLINE % "Text"`)
-OVERSTRIKE_START    start overstrike
-OVERSTRIKE_STOP     stop overstrike
-OVERSTRIKE          overstrike text
+UNDERLINE_START     start underline text
+UNDERLINE_STOP      stop underline text
+OVERSTRIKE_START    start overline
+OVERSTRIKE_STOP     stop overline
 STRIKE_START        start strike trough
 STRIKE_STOP         stop strike trough
-STRIKE              strike trough text
 GROUP_START         start of group
 GROUP_END           end of group
-GROUP               group text
-NEW_LINE            start in new line (:code:`b += "Text" + b.NEW_LINE`)
-NBSP                none breaking space (:code:`b += "Python" + b.NBSP + "3.4"`)
+NEW_LINE            start in new line
+NBSP                none breaking space
 =================== ===========

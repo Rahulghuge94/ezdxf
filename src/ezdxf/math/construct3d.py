@@ -1,17 +1,28 @@
-# Copyright (c) 2020-2021, Manfred Moitzi
+# Copyright (c) 2020-2022, Manfred Moitzi
 # License: MIT License
-from typing import Sequence, List, Iterable, Union, TYPE_CHECKING, Tuple
+from typing import Sequence, List, Iterable, TYPE_CHECKING, Tuple, Optional
 from enum import IntEnum
 import math
-from ezdxf.math import Vec3, Vec2, Matrix44
+from ezdxf.math import Vec3, Matrix44, X_AXIS, Y_AXIS, Z_AXIS
 
 if TYPE_CHECKING:
-    from ezdxf.eztypes import Vertex
+    from ezdxf.math import Vertex, AnyVec
 
 __all__ = [
-    "is_planar_face", "subdivide_face", "subdivide_ngons", "Plane",
-    "LocationState", "normal_vector_3p", "distance_point_line_3d",
-    "basic_transformation", "best_fit_normal", "BarycentricCoordinates"
+    "is_planar_face",
+    "subdivide_face",
+    "subdivide_ngons",
+    "Plane",
+    "LocationState",
+    "normal_vector_3p",
+    "distance_point_line_3d",
+    "intersection_line_line_3d",
+    "basic_transformation",
+    "best_fit_normal",
+    "BarycentricCoordinates",
+    "linear_vertex_spacing",
+    "has_matrix_3d_stretching",
+    "spherical_envelope",
 ]
 
 
@@ -23,7 +34,7 @@ class LocationState(IntEnum):
 
 
 def is_planar_face(face: Sequence[Vec3], abs_tol=1e-9) -> bool:
-    """ Returns ``True`` if sequence of vectors is a planar face.
+    """Returns ``True`` if sequence of vectors is a planar face.
 
     Args:
          face: sequence of :class:`~ezdxf.math.Vec3` objects
@@ -36,44 +47,49 @@ def is_planar_face(face: Sequence[Vec3], abs_tol=1e-9) -> bool:
         return True
     first_normal = None
     for index in range(len(face) - 2):
-        a, b, c = face[index:index + 3]
+        a, b, c = face[index : index + 3]
         normal = (b - a).cross(c - b).normalize()
         if first_normal is None:
             first_normal = normal
-        elif not first_normal.isclose(normal, abs_tol):
+        elif not first_normal.isclose(normal, abs_tol=abs_tol):
             return False
     return True
 
 
-def subdivide_face(face: Sequence[Union[Vec3, Vec2]], quads=True) -> Iterable[
-    List[Vec3]]:
-    """ Yields new subdivided faces. Creates new faces from subdivided edges and the face midpoint by linear
-    interpolation.
+def subdivide_face(
+    face: Sequence["AnyVec"], quads: bool = True
+) -> Iterable[Tuple[Vec3, ...]]:
+    """Yields new subdivided faces. Creates new faces from subdivided edges and
+    the face midpoint by linear interpolation.
 
     Args:
-        face: a sequence of vertices, :class:`Vec2` and :class:`Vec3` objects supported.
+        face: a sequence of vertices, :class:`Vec2` and :class:`Vec3` objects
+            supported.
         quads: create quad faces if ``True`` else create triangles
 
     """
     if len(face) < 3:
-        raise ValueError('3 or more vertices required.')
-    len_face = len(face)
+        raise ValueError("3 or more vertices required.")
+    len_face: int = len(face)
     mid_pos = Vec3.sum(face) / len_face
-    subdiv_location = [face[i].lerp(face[(i + 1) % len_face]) for i in
-                       range(len_face)]
+    subdiv_location: List[Vec3] = [
+        face[i].lerp(face[(i + 1) % len_face]) for i in range(len_face)
+    ]
 
     for index, vertex in enumerate(face):
         if quads:
             yield vertex, subdiv_location[index], mid_pos, subdiv_location[
-                index - 1]
+                index - 1
+            ]
         else:
             yield subdiv_location[index - 1], vertex, mid_pos
             yield vertex, subdiv_location[index], mid_pos
 
 
-def subdivide_ngons(faces: Iterable[Sequence[Union[Vec3, Vec2]]]) -> Iterable[
-    List[Vec3]]:
-    """ Yields only triangles or quad faces, subdivides ngons into triangles.
+def subdivide_ngons(
+    faces: Iterable[Sequence["AnyVec"]],
+) -> Iterable[Tuple[Vec3, ...]]:
+    """Yields only triangles or quad faces, subdivides ngons into triangles.
 
     Args:
         faces: iterable of faces as sequence of :class:`Vec2` and
@@ -82,7 +98,7 @@ def subdivide_ngons(faces: Iterable[Sequence[Union[Vec3, Vec2]]]) -> Iterable[
     """
     for face in faces:
         if len(face) < 5:
-            yield face
+            yield Vec3.tuple(face)
         else:
             mid_pos = Vec3.sum(face) / len(face)
             for index, vertex in enumerate(face):
@@ -90,30 +106,30 @@ def subdivide_ngons(faces: Iterable[Sequence[Union[Vec3, Vec2]]]) -> Iterable[
 
 
 def normal_vector_3p(a: Vec3, b: Vec3, c: Vec3) -> Vec3:
-    """ Returns normal vector for 3 points, which is the normalized cross
+    """Returns normal vector for 3 points, which is the normalized cross
     product for: :code:`a->b x a->c`.
     """
     return (b - a).cross(c - a).normalize()
 
 
-def best_fit_normal(vertices: Iterable['Vertex']) -> Vec3:
-    """ Returns the "best fit" normal for a plane defined by three or more
+def best_fit_normal(vertices: Iterable["Vertex"]) -> Vec3:
+    """Returns the "best fit" normal for a plane defined by three or more
     vertices. This function tolerates imperfect plane vertices. Safe function
     to detect the extrusion vector of flat arbitrary polygons.
 
     """
     # Source: https://gamemath.com/book/geomprims.html#plane_best_fit (9.5.3)
-    vertices = Vec3.list(vertices)
-    if len(vertices) < 3:
+    _vertices = Vec3.list(vertices)
+    if len(_vertices) < 3:
         raise ValueError("3 or more vertices required")
-    first = vertices[0]
-    if not first.isclose(vertices[-1]):
-        vertices.append(first)  # close polygon
+    first = _vertices[0]
+    if not first.isclose(_vertices[-1]):
+        _vertices.append(first)  # close polygon
     prev_x, prev_y, prev_z = first.xyz
     nx = 0.0
     ny = 0.0
     nz = 0.0
-    for v in vertices[1:]:
+    for v in _vertices[1:]:
         x, y, z = v.xyz
         nx += (prev_z + z) * (prev_y - y)
         ny += (prev_x + x) * (prev_z - z)
@@ -125,11 +141,11 @@ def best_fit_normal(vertices: Iterable['Vertex']) -> Vec3:
 
 
 def distance_point_line_3d(point: Vec3, start: Vec3, end: Vec3) -> float:
-    """ Returns the normal distance from `point` to 3D line defined by `start-`
+    """Returns the normal distance from `point` to 3D line defined by `start-`
     and `end` point.
     """
     if start.isclose(end):
-        raise ZeroDivisionError('Not a line.')
+        raise ZeroDivisionError("Not a line.")
     v1 = point - start
     # point projected onto line start to end:
     v2 = (end - start).project(v1)
@@ -143,11 +159,45 @@ def distance_point_line_3d(point: Vec3, start: Vec3, end: Vec3) -> float:
         return math.sqrt(diff)
 
 
+def intersection_line_line_3d(
+    line1: Sequence[Vec3],
+    line2: Sequence[Vec3],
+    virtual: bool = True,
+    abs_tol: float = 1e-10,
+) -> Optional[Vec3]:
+    """
+    Returns the intersection point of two 3D lines, returns ``None`` if lines
+    do not intersect.
+
+    Args:
+        line1: first line as tuple of two points as :class:`Vec3` objects
+        line2: second line as tuple of two points as :class:`Vec3` objects
+        virtual: ``True`` returns any intersection point, ``False`` returns only
+            real intersection points
+        abs_tol: absolute tolerance for comparisons
+
+    .. versionadded:: 0.17.2
+
+    """
+    from ezdxf.math import intersection_ray_ray_3d, BoundingBox
+    res = intersection_ray_ray_3d(line1, line2, abs_tol)
+    if len(res) != 1:
+        return None
+
+    point = res[0]
+    if virtual:
+        return point
+    if BoundingBox(line1).inside(point) and BoundingBox(line2).inside(point):
+        return point
+    return None
+
+
 def basic_transformation(
-        move: 'Vertex' = (0, 0, 0),
-        scale: 'Vertex' = (1, 1, 1),
-        z_rotation: float = 0) -> Matrix44:
-    """ Returns a combined transformation matrix for translation, scaling and
+    move: "Vertex" = (0, 0, 0),
+    scale: "Vertex" = (1, 1, 1),
+    z_rotation: float = 0,
+) -> Matrix44:
+    """Returns a combined transformation matrix for translation, scaling and
     rotation about the z-axis.
 
     Args:
@@ -167,10 +217,11 @@ def basic_transformation(
 
 
 class Plane:
-    """ Represents a plane in 3D space as normal vector and the perpendicular
+    """Represents a plane in 3D space as normal vector and the perpendicular
     distance from origin.
     """
-    __slots__ = ('_normal', '_distance_from_origin')
+
+    __slots__ = ("_normal", "_distance_from_origin")
 
     def __init__(self, normal: Vec3, distance: float):
         self._normal = normal
@@ -179,70 +230,76 @@ class Plane:
 
     @property
     def normal(self) -> Vec3:
-        """ Normal vector of the plane. """
+        """Normal vector of the plane."""
         return self._normal
 
     @property
     def distance_from_origin(self) -> float:
-        """ The (perpendicular) distance of the plane from origin (0, 0, 0). """
+        """The (perpendicular) distance of the plane from origin (0, 0, 0)."""
         return self._distance_from_origin
 
     @property
     def vector(self) -> Vec3:
-        """ Returns the location vector. """
+        """Returns the location vector."""
         return self._normal * self._distance_from_origin
 
     @classmethod
-    def from_3p(cls, a: Vec3, b: Vec3, c: Vec3) -> 'Plane':
-        """ Returns a new plane from 3 points in space. """
+    def from_3p(cls, a: Vec3, b: Vec3, c: Vec3) -> "Plane":
+        """Returns a new plane from 3 points in space."""
         n = (b - a).cross(c - a).normalize()
         return Plane(n, n.dot(a))
 
     @classmethod
-    def from_vector(cls, vector) -> 'Plane':
-        """ Returns a new plane from a location vector. """
+    def from_vector(cls, vector) -> "Plane":
+        """Returns a new plane from a location vector."""
         v = Vec3(vector)
         return Plane(v.normalize(), v.magnitude)
 
-    def __copy__(self) -> 'Plane':
-        """ Returns a copy of the plane. """
+    def __copy__(self) -> "Plane":
+        """Returns a copy of the plane."""
         return self.__class__(self._normal, self._distance_from_origin)
 
     copy = __copy__
 
     def __repr__(self):
-        return f'Plane({repr(self._normal)}, {self._distance_from_origin})'
+        return f"Plane({repr(self._normal)}, {self._distance_from_origin})"
 
-    def __eq__(self, other: 'Plane'):
-        if isinstance(other, Plane):
-            return self.vector == other.vector
-        else:
-            raise TypeError
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Plane):
+            return NotImplemented
+        return self.vector == other.vector
 
     def signed_distance_to(self, v: Vec3) -> float:
-        """ Returns signed distance of vertex `v` to plane, if distance is > 0, `v` is in 'front' of plane, in direction
-        of the normal vector, if distance is < 0, `v` is at the 'back' of the plane, in the opposite direction of
-        the normal vector.
+        """Returns signed distance of vertex `v` to plane, if distance is > 0,
+        `v` is in 'front' of plane, in direction of the normal vector, if
+        distance is < 0, `v` is at the 'back' of the plane, in the opposite
+        direction of the normal vector.
 
         """
         return self._normal.dot(v) - self._distance_from_origin
 
     def distance_to(self, v: Vec3) -> float:
-        """ Returns absolute (unsigned) distance of vertex `v` to plane. """
+        """Returns absolute (unsigned) distance of vertex `v` to plane."""
         return math.fabs(self.signed_distance_to(v))
 
     def is_coplanar_vertex(self, v: Vec3, abs_tol=1e-9) -> bool:
-        """ Returns ``True`` if vertex `v` is coplanar, distance from plane to vertex `v` is 0. """
+        """Returns ``True`` if vertex `v` is coplanar, distance from plane to
+        vertex `v` is 0.
+        """
         return self.distance_to(v) < abs_tol
 
-    def is_coplanar_plane(self, p: 'Plane', abs_tol=1e-9) -> bool:
-        """ Returns ``True`` if plane `p` is coplanar, normal vectors in same or opposite direction. """
+    def is_coplanar_plane(self, p: "Plane", abs_tol=1e-9) -> bool:
+        """Returns ``True`` if plane `p` is coplanar, normal vectors in same or
+        opposite direction.
+        """
         n_is_close = self._normal.isclose
-        return n_is_close(p._normal, abs_tol) or n_is_close(-p._normal, abs_tol)
+        return n_is_close(p._normal, abs_tol=abs_tol) or n_is_close(
+            -p._normal, abs_tol=abs_tol
+        )
 
 
 class BarycentricCoordinates:
-    """ Barycentric coordinate calculation.
+    """Barycentric coordinate calculation.
 
     The arguments `a`, `b` and `c` are the cartesian coordinates of an arbitrary
     triangle in 3D space. The barycentric coordinates (b1, b2, b3) define the
@@ -264,9 +321,10 @@ class BarycentricCoordinates:
       (a + b + c)/3
 
     """
+
     # Source: https://gamemath.com/book/geomprims.html#triangle_barycentric_space
 
-    def __init__(self, a: 'Vertex', b: 'Vertex', c: 'Vertex'):
+    def __init__(self, a: "Vertex", b: "Vertex", c: "Vertex"):
         self.a = Vec3(a)
         self.b = Vec3(b)
         self.c = Vec3(c)
@@ -277,9 +335,9 @@ class BarycentricCoordinates:
         self._n = e1xe2.normalize()
         self._denom = e1xe2.dot(self._n)
         if abs(self._denom) < 1e-9:
-            raise ValueError('invalid triangle')
+            raise ValueError("invalid triangle")
 
-    def from_cartesian(self, p: 'Vertex') -> Vec3:
+    def from_cartesian(self, p: "Vertex") -> Vec3:
         p = Vec3(p)
         n = self._n
         denom = self._denom
@@ -291,6 +349,55 @@ class BarycentricCoordinates:
         b3 = self._e3.cross(d2).dot(n) / denom
         return Vec3(b1, b2, b3)
 
-    def to_cartesian(self, b: 'Vertex') -> Vec3:
+    def to_cartesian(self, b: "Vertex") -> Vec3:
         b1, b2, b3 = Vec3(b).xyz
         return self.a * b1 + self.b * b2 + self.c * b3
+
+
+def linear_vertex_spacing(start: Vec3, end: Vec3, count: int) -> List[Vec3]:
+    """Returns `count` evenly spaced vertices from `start` to `end`."""
+    if count <= 2:
+        return [start, end]
+    distance = end - start
+    if distance.is_null:
+        return [start] * count
+
+    vertices = [start]
+    step = distance.normalize(distance.magnitude / (count - 1))
+    for _ in range(1, count - 1):
+        start += step
+        vertices.append(start)
+    vertices.append(end)
+    return vertices
+
+
+def has_matrix_3d_stretching(m: Matrix44) -> bool:
+    """Returns ``True`` if matrix `m` performs a non-uniform xyz-scaling.
+    Uniform scaling is not stretching in this context.
+
+    Does not check if the target system is a cartesian coordinate system, use the
+    :class:`~ezdxf.math.Matrix44` property :attr:`~ezdxf.math.Matrix44.is_cartesian`
+    for that.
+    """
+    ux_mag_sqr = m.transform_direction(X_AXIS).magnitude_square
+    uy = m.transform_direction(Y_AXIS)
+    uz = m.transform_direction(Z_AXIS)
+    return not math.isclose(
+        ux_mag_sqr, uy.magnitude_square
+    ) or not math.isclose(ux_mag_sqr, uz.magnitude_square)
+
+
+def spherical_envelope(points: Sequence["Vertex"]) -> Tuple[Vec3, float]:
+    """Calculate the spherical envelope for the given points.  Returns the
+    centroid (a.k.a. geometric center) and the radius of the enclosing sphere.
+
+    .. note::
+
+        The result does not represent the minimal bounding sphere!
+
+    .. versionadded:: 0.18
+
+    """
+    centroid = Vec3.sum(points) / len(points)
+    radius = max(centroid.distance(p) for p in points)
+    return centroid, radius

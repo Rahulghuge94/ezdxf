@@ -3,29 +3,39 @@
 from typing import Iterable, Optional, cast, TYPE_CHECKING, List
 import abc
 import math
-from ezdxf.entities import DXFEntity
-from ezdxf.lldxf import const
-from ezdxf.math import Vec3, UCS, Z_AXIS, X_AXIS
-from ezdxf.path import Path, make_path, from_hatch, from_vertices
-from ezdxf.render import MeshBuilder, MeshVertexMerger, TraceBuilder
+from ezdxf.entities import DXFEntity, Insert, get_font_name
 
-from ezdxf.proxygraphic import ProxyGraphic
+from ezdxf.lldxf import const
+from ezdxf.enums import TextEntityAlignment
+from ezdxf.math import Vec3, UCS, Z_AXIS, X_AXIS
+from ezdxf.path import Path, make_path, from_vertices
+from ezdxf.render import MeshBuilder, MeshVertexMerger, TraceBuilder
+from ezdxf.protocols import SupportsVirtualEntities, virtual_entities
+
 from ezdxf.tools.text import (
-    TextLine, unified_alignment, plain_text, text_wrap,
+    TextLine,
+    unified_alignment,
+    plain_text,
+    text_wrap,
 )
 from ezdxf.tools import fonts
 
 if TYPE_CHECKING:
-    from ezdxf.eztypes import LWPolyline, Polyline, MText, Hatch, Insert
+    from ezdxf.eztypes import LWPolyline, Polyline, MText
 
 __all__ = [
-    "make_primitive", "recursive_decompose", "to_primitives", "to_vertices",
-    "to_control_vertices", "to_paths", "to_meshes"
+    "make_primitive",
+    "recursive_decompose",
+    "to_primitives",
+    "to_vertices",
+    "to_control_vertices",
+    "to_paths",
+    "to_meshes",
 ]
 
 
 class Primitive(abc.ABC):
-    """ It is not efficient to create the Path() or MeshBuilder() representation
+    """It is not efficient to create the Path() or MeshBuilder() representation
     by default. For some entities the it's just not needed (LINE, POINT) and for
     others the builtin flattening() method is more efficient or accurate than
     using a Path() proxy object. (ARC, CIRCLE, ELLIPSE, SPLINE).
@@ -36,21 +46,24 @@ class Primitive(abc.ABC):
     by direct attribute access.
 
     """
+
     max_flattening_distance: float = 0.01
 
-    def __init__(self, entity: DXFEntity, max_flattening_distance=None):
+    def __init__(
+        self, entity: DXFEntity, max_flattening_distance: Optional[float] = None
+    ):
         self.entity: DXFEntity = entity
         # Path representation for linear entities:
         self._path: Optional[Path] = None
         # MeshBuilder representation for mesh based entities:
         # PolygonMesh, PolyFaceMesh, Mesh
         self._mesh: Optional[MeshBuilder] = None
-        if max_flattening_distance:
+        if max_flattening_distance is not None:
             self.max_flattening_distance = max_flattening_distance
 
     @property
     def is_empty(self) -> bool:
-        """ Returns `True` if represents an empty primitive which do not
+        """Returns `True` if represents an empty primitive which do not
         yield any vertices.
 
         """
@@ -60,7 +73,7 @@ class Primitive(abc.ABC):
 
     @property
     def path(self) -> Optional[Path]:
-        """ :class:`~ezdxf.path.Path` representation or ``None``,
+        """:class:`~ezdxf.path.Path` representation or ``None``,
         idiom to check if is a path representation (could be empty)::
 
             if primitive.path is not None:
@@ -71,7 +84,7 @@ class Primitive(abc.ABC):
 
     @property
     def mesh(self) -> Optional[MeshBuilder]:
-        """ :class:`~ezdxf.render.mesh.MeshBuilder` representation or ``None``,
+        """:class:`~ezdxf.render.mesh.MeshBuilder` representation or ``None``,
         idiom to check if is a mesh representation (could be empty)::
 
             if primitive.mesh is not None:
@@ -82,7 +95,7 @@ class Primitive(abc.ABC):
 
     @abc.abstractmethod
     def vertices(self) -> Iterable[Vec3]:
-        """ Yields all vertices of the path/mesh representation as
+        """Yields all vertices of the path/mesh representation as
         :class:`~ezdxf.math.Vec3` objects.
 
         """
@@ -99,7 +112,7 @@ class EmptyPrimitive(Primitive):
 
 
 class ConvertedPrimitive(Primitive):
-    """ Base class for all DXF entities which store the path/mesh representation
+    """Base class for all DXF entities which store the path/mesh representation
     at instantiation.
 
     """
@@ -110,7 +123,7 @@ class ConvertedPrimitive(Primitive):
 
     @abc.abstractmethod
     def _convert_entity(self):
-        """ This method creates the path/mesh representation. """
+        """This method creates the path/mesh representation."""
         pass
 
     @property
@@ -123,15 +136,15 @@ class ConvertedPrimitive(Primitive):
 
     def vertices(self) -> Iterable[Vec3]:
         if self.path:
-            yield from self._path.flattening(self.max_flattening_distance)
+            yield from self._path.flattening(self.max_flattening_distance)  # type: ignore
         elif self.mesh:
-            yield from self._mesh.vertices
+            yield from self._mesh.vertices  # type: ignore
 
 
 class CurvePrimitive(Primitive):
     @property
     def path(self) -> Optional[Path]:
-        """ Create path representation on demand. """
+        """Create path representation on demand."""
         if self._path is None:
             self._path = make_path(self.entity)
         return self._path
@@ -141,13 +154,14 @@ class CurvePrimitive(Primitive):
         # perfectly represent elliptic arcs (CIRCLE, ARC, ELLIPSE).
         # SPLINE: cubic bezier curves do not perfectly represent splines with
         # degree != 3.
-        yield from self.entity.flattening(self.max_flattening_distance)
+        yield from self.entity.flattening(self.max_flattening_distance)  # type: ignore
 
 
 class LinePrimitive(Primitive):
+    # TODO: apply thickness if not 0
     @property
     def path(self) -> Optional[Path]:
-        """ Create path representation on demand. """
+        """Create path representation on demand."""
         if self._path is None:
             self._path = make_path(self.entity)
         return self._path
@@ -159,13 +173,17 @@ class LinePrimitive(Primitive):
 
 
 class LwPolylinePrimitive(ConvertedPrimitive):
+    # TODO: apply thickness if not 0
     def _convert_entity(self):
-        e: 'LWPolyline' = cast('LWPolyline', self.entity)
+        e: "LWPolyline" = cast("LWPolyline", self.entity)
         if e.has_width:  # use a mesh representation:
+            # TraceBuilder operates in OCS!
+            ocs = e.ocs()
+            elevation = e.dxf.elevation
             tb = TraceBuilder.from_polyline(e)
             mb = MeshVertexMerger()  # merges coincident vertices
-            for face in tb.faces():
-                mb.add_face(Vec3.generate(face))
+            for face in tb.faces_wcs(ocs, elevation):
+                mb.add_face(face)
             self._mesh = MeshBuilder.from_builder(mb)
         else:  # use a path representation to support bulges!
             self._path = make_path(e)
@@ -174,7 +192,7 @@ class LwPolylinePrimitive(ConvertedPrimitive):
 class PointPrimitive(Primitive):
     @property
     def path(self) -> Optional[Path]:
-        """ Create path representation on demand.
+        """Create path representation on demand.
 
         :class:`Path` can not represent a point, a :class:`Path` with only a
         start point yields not vertices!
@@ -194,37 +212,43 @@ class MeshPrimitive(ConvertedPrimitive):
 
 
 class QuadrilateralPrimitive(ConvertedPrimitive):
+    # TODO: apply thickness if not 0
     def _convert_entity(self):
         self._path = make_path(self.entity)
 
 
 class PolylinePrimitive(ConvertedPrimitive):
+    # TODO: apply thickness if not 0
     def _convert_entity(self):
-        e: 'Polyline' = cast('Polyline', self.entity)
-        if e.is_2d_polyline or e.is_3d_polyline:
+        e: "Polyline" = cast("Polyline", self.entity)
+        if e.is_2d_polyline and e.has_width:
+            # TraceBuilder operates in OCS!
+            ocs = e.ocs()
+            elevation = e.dxf.elevation.z
+            tb = TraceBuilder.from_polyline(e)
+            mb = MeshVertexMerger()  # merges coincident vertices
+            for face in tb.faces_wcs(ocs, elevation):
+                mb.add_face(face)
+            self._mesh = MeshBuilder.from_builder(mb)
+        elif e.is_2d_polyline or e.is_3d_polyline:
             self._path = make_path(e)
         else:
             m = MeshVertexMerger.from_polyface(e)
             self._mesh = MeshBuilder.from_builder(m)
 
 
+class HatchPrimitive(ConvertedPrimitive):
+    def _convert_entity(self):
+        self._path = make_path(self.entity)
+
+
 DESCENDER_FACTOR = 0.333  # from TXT SHX font - just guessing
 X_HEIGHT_FACTOR = 0.666  # from TXT SHX font - just guessing
 
 
-def get_font_name(entity: 'DXFEntity'):
-    font_name = "txt"
-    if entity.doc:
-        style_name = entity.dxf.style
-        style = entity.doc.styles.get(style_name)
-        if style:
-            font_name = style.dxf.font
-    return font_name
-
-
 class TextLinePrimitive(ConvertedPrimitive):
     def _convert_entity(self):
-        """ Calculates the rough border path for a single line text.
+        """Calculates the rough border path for a single line text.
 
         Calculation is based on a mono-spaced font and therefore the border
         path is just an educated guess.
@@ -233,22 +257,19 @@ class TextLinePrimitive(ConvertedPrimitive):
 
         """
 
-        def text_rotation() -> float:
+        def text_rotation():
             if fit_or_aligned and not p1.isclose(p2):
                 return (p2 - p1).angle
             else:
                 return math.radians(text.dxf.rotation)
 
-        def location() -> Vec3:
-            if alignment == 'LEFT':
-                return p1
-            elif fit_or_aligned:
+        def location():
+            if fit_or_aligned:
                 return p1.lerp(p2, factor=0.5)
-            else:
-                return p2
+            return p1
 
-        text = cast('Text', self.entity)
-        if text.dxftype() == 'ATTDEF':
+        text = cast("Text", self.entity)
+        if text.dxftype() == "ATTDEF":
             # ATTDEF outside of a BLOCK renders the tag rather than the value
             content = text.dxf.tag
         else:
@@ -260,13 +281,17 @@ class TextLinePrimitive(ConvertedPrimitive):
             self._path = Path()
             return
 
-        p1: Vec3 = text.dxf.insert
-        p2: Vec3 = text.dxf.align_point
-        font = fonts.make_font(get_font_name(text), text.dxf.height,
-                               text.dxf.width)
+        font = fonts.make_font(
+            get_font_name(text), text.dxf.height, text.dxf.width
+        )
         text_line = TextLine(content, font)
-        alignment: str = text.get_align()
-        fit_or_aligned = alignment == 'FIT' or alignment == 'ALIGNED'
+        alignment, p1, p2 = text.get_placement()
+        if p2 is None:
+            p2 = p1
+        fit_or_aligned = (
+            alignment == TextEntityAlignment.FIT
+            or alignment == TextEntityAlignment.ALIGNED
+        )
         if text.dxf.halign > 2:  # ALIGNED=3, MIDDLE=4, FIT=5
             text_line.stretch(alignment, p1, p2)
         halign, valign = unified_alignment(text)
@@ -274,7 +299,9 @@ class TextLinePrimitive(ConvertedPrimitive):
         mirror_y = -1 if text.is_upside_down else 1
         oblique: float = math.radians(text.dxf.oblique)
         corner_vertices = text_line.corner_vertices(
-            location(), halign, valign,
+            location(),
+            halign,
+            valign,
             angle=text_rotation(),
             scale=(mirror_x, mirror_y),
             oblique=oblique,
@@ -289,7 +316,7 @@ class TextLinePrimitive(ConvertedPrimitive):
 
 class MTextPrimitive(ConvertedPrimitive):
     def _convert_entity(self):
-        """ Calculates the rough border path for a MTEXT entity.
+        """Calculates the rough border path for a MTEXT entity.
 
         Calculation is based on a mono-spaced font and therefore the border
         path is just an educated guess.
@@ -300,7 +327,7 @@ class MTextPrimitive(ConvertedPrimitive):
 
         def get_content() -> List[str]:
             text = mtext.plain_text(split=False)
-            return text_wrap(text, box_width, font.text_width)
+            return text_wrap(text, box_width, font.text_width)  # type: ignore
 
         def get_max_str() -> str:
             return max(content, key=lambda s: len(s))
@@ -328,7 +355,7 @@ class MTextPrimitive(ConvertedPrimitive):
             return line_height * line_count + spacing * (line_count - 1)
 
         def get_ucs() -> UCS:
-            """ Create local coordinate system:
+            """Create local coordinate system:
             origin = insertion point
             z-axis = extrusion vector
             x-axis = text_direction or text rotation, text rotation requires
@@ -338,9 +365,9 @@ class MTextPrimitive(ConvertedPrimitive):
             origin = mtext.dxf.insert
             z_axis = mtext.dxf.extrusion  # default is Z_AXIS
             x_axis = X_AXIS
-            if mtext.dxf.hasattr('text_direction'):
+            if mtext.dxf.hasattr("text_direction"):
                 x_axis = mtext.dxf.text_direction
-            elif mtext.dxf.hasattr('rotation'):
+            elif mtext.dxf.hasattr("rotation"):
                 # TODO: what if extrusion vector is not (0, 0, 1)
                 x_axis = Vec3.from_deg_angle(mtext.dxf.rotation)
                 z_axis = Z_AXIS
@@ -361,31 +388,41 @@ class MTextPrimitive(ConvertedPrimitive):
             return shift_x, shift_y
 
         def get_corner_vertices() -> Iterable[Vec3]:
-            """ Create corner vertices in the local working plan, where
+            """Create corner vertices in the local working plan, where
             the insertion point is the origin.
             """
-            rect_width = mtext.dxf.get('rect_width', get_rect_width())
-            rect_height = mtext.dxf.get('rect_height', get_rect_height())
+            if columns:
+                rect_width = columns.total_width
+                rect_height = columns.total_height
+                # TODO: this works only for reliable sources like AutoCAD,
+                #  BricsCAD and ezdxf! So far no known column support from
+                #  other DXF exporters.
+            else:
+                rect_width = mtext.dxf.get("rect_width", get_rect_width())
+                rect_height = mtext.dxf.get("rect_height", get_rect_height())
             # TOP LEFT alignment:
             vertices = [
                 Vec3(0, 0),
                 Vec3(rect_width, 0),
                 Vec3(rect_width, -rect_height),
-                Vec3(0, -rect_height)
+                Vec3(0, -rect_height),
             ]
             sx, sy = get_shift_factors()
             shift = Vec3(sx * rect_width, sy * rect_height)
             return (v + shift for v in vertices)
 
         mtext: "MText" = cast("MText", self.entity)
-        box_width = mtext.dxf.get('width', 0)
-        font = fonts.make_font(get_font_name(mtext), mtext.dxf.char_height, 1.0)
-
-        content: List[str] = get_content()
-        if len(content) == 0:
-            # empty path - does not render any vertices!
-            self._path = Path()
-            return
+        columns = mtext.columns
+        if columns is None:
+            box_width = mtext.dxf.get("width", 0)
+            font = fonts.make_font(
+                get_font_name(mtext), mtext.dxf.char_height, 1.0
+            )
+            content: List[str] = get_content()
+            if len(content) == 0:
+                # empty path - does not render any vertices!
+                self._path = Path()
+                return
         ucs = get_ucs()
         corner_vertices = get_corner_vertices()
         self._path = from_vertices(
@@ -395,8 +432,9 @@ class MTextPrimitive(ConvertedPrimitive):
 
 
 class PathPrimitive(Primitive):
-    def __init__(self, path: Path, entity: DXFEntity,
-                 max_flattening_distance=None):
+    def __init__(
+        self, path: Path, entity: DXFEntity, max_flattening_distance=None
+    ):
         super().__init__(entity, max_flattening_distance)
         self._path = path
 
@@ -405,7 +443,7 @@ class PathPrimitive(Primitive):
         return self._path
 
     def vertices(self) -> Iterable[Vec3]:
-        yield from self._path.flattening(self.max_flattening_distance)
+        yield from self._path.flattening(self.max_flattening_distance)  # type: ignore
 
 
 class ImagePrimitive(ConvertedPrimitive):
@@ -431,7 +469,8 @@ _PRIMITIVE_CLASSES = {
     "ATTDEF": TextLinePrimitive,
     "CIRCLE": CurvePrimitive,
     "ELLIPSE": CurvePrimitive,
-    # HATCH: Special handling required, see to_primitives() function
+    "HATCH": HatchPrimitive,  # multi-path object
+    "MPOLYGON": HatchPrimitive,  # multi-path object
     "HELIX": CurvePrimitive,
     "IMAGE": ImagePrimitive,
     "LINE": LinePrimitive,
@@ -449,9 +488,10 @@ _PRIMITIVE_CLASSES = {
 }
 
 
-def make_primitive(entity: DXFEntity,
-                   max_flattening_distance=None) -> Primitive:
-    """ Factory to create path/mesh primitives. The `max_flattening_distance`
+def make_primitive(
+    entity: DXFEntity, max_flattening_distance=None
+) -> Primitive:
+    """Factory to create path/mesh primitives. The `max_flattening_distance`
     defines the max distance between the approximation line and the original
     curve. Use `max_flattening_distance` to override the default value.
 
@@ -460,11 +500,8 @@ def make_primitive(entity: DXFEntity,
     The :attr:`path` and the :attr:`mesh` attributes of an empty primitive
     are ``None`` and the :meth:`vertices` method  yields no vertices.
 
-    Returns an empty primitive for the :class:`~ezdxf.entities.Hatch` entity,
-    see docs of the :mod:`~ezdxf.disassemble` module. Use the this to create
-    multiple primitives from the HATCH boundary paths::
-
-        primitives = list(to_primitives([hatch_entity]))
+    .. versionchanged:: 0.17
+        regular support for the :class:`~ezdxf.entities.Hatch` entity.
 
     """
     cls = _PRIMITIVE_CLASSES.get(entity.dxftype(), EmptyPrimitive)
@@ -475,7 +512,7 @@ def make_primitive(entity: DXFEntity,
 
 
 def recursive_decompose(entities: Iterable[DXFEntity]) -> Iterable[DXFEntity]:
-    """ Recursive decomposition of the given DXF entity collection into a flat
+    """Recursive decomposition of the given DXF entity collection into a flat
     DXF entity stream. All block references (INSERT) and entities which provide
     a :meth:`virtual_entities` method will be disassembled into simple DXF
     sub-entities, therefore the returned entity stream does not contain any
@@ -497,32 +534,24 @@ def recursive_decompose(entities: Iterable[DXFEntity]) -> Iterable[DXFEntity]:
 
     """
     for entity in entities:
-        dxftype = entity.dxftype()
-        # ignore this virtual_entities() methods:
-        if dxftype in ('POINT', 'LWPOLYLINE', 'POLYLINE'):
-            yield entity
-        elif dxftype == 'INSERT':
-            entity = cast('Insert', entity)
+        if isinstance(entity, Insert):
             if entity.mcount > 1:
                 yield from recursive_decompose(entity.multi_insert())
             else:
                 yield from entity.attribs
-                yield from recursive_decompose(entity.virtual_entities())
-        elif hasattr(entity, 'virtual_entities'):
+                yield from recursive_decompose(virtual_entities(entity))
+        # has a required __virtual_entities__() to be rendered?
+        elif isinstance(entity, SupportsVirtualEntities):
             # could contain block references:
-            yield from recursive_decompose(entity.virtual_entities())
-        # As long as MLeader.virtual_entities() is not implemented,
-        # use existing proxy graphic:
-        elif dxftype in ('MLEADER', 'MULTILEADER') and entity.proxy_graphic:
-            yield from ProxyGraphic(
-                entity.proxy_graphic, entity.doc).virtual_entities()
+            yield from recursive_decompose(virtual_entities(entity))
         else:
             yield entity
 
 
-def to_primitives(entities: Iterable[DXFEntity],
-                  max_flattening_distance: float = None) -> Iterable[Primitive]:
-    """ Yields all DXF entities as path or mesh primitives. Yields
+def to_primitives(
+    entities: Iterable[DXFEntity], max_flattening_distance: float = None
+) -> Iterable[Primitive]:
+    """Yields all DXF entities as path or mesh primitives. Yields
     unsupported entities as empty primitives, see :func:`make_primitive`.
 
     Args:
@@ -531,28 +560,11 @@ def to_primitives(entities: Iterable[DXFEntity],
 
     """
     for e in entities:
-        # Special handling for HATCH required, because a HATCH entity can not be
-        # reduced into a single path or mesh.
-        if e.dxftype() == 'HATCH':
-            # noinspection PyTypeChecker
-            yield from _hatch_primitives(e, max_flattening_distance)
-        else:
-            yield make_primitive(e, max_flattening_distance)
-
-
-def _hatch_primitives(
-        hatch: 'Hatch', max_flattening_distance=None) -> Iterable[Primitive]:
-    """ Yield all HATCH boundary paths as separated Path() objects. """
-    for p in from_hatch(hatch):
-        yield PathPrimitive(
-            p,
-            hatch,
-            max_flattening_distance
-        )
+        yield make_primitive(e, max_flattening_distance)
 
 
 def to_vertices(primitives: Iterable[Primitive]) -> Iterable[Vec3]:
-    """ Yields all vertices from the given `primitives`. Paths will be flattened
+    """Yields all vertices from the given `primitives`. Paths will be flattened
     to create the associated vertices. See also :func:`to_control_vertices` to
     collect only the control vertices from the paths without flattening.
 
@@ -562,7 +574,7 @@ def to_vertices(primitives: Iterable[Primitive]) -> Iterable[Vec3]:
 
 
 def to_paths(primitives: Iterable[Primitive]) -> Iterable[Path]:
-    """ Yields all :class:`~ezdxf.path.Path` objects from the given
+    """Yields all :class:`~ezdxf.path.Path` objects from the given
     `primitives`. Ignores primitives without a defined path.
 
     """
@@ -572,7 +584,7 @@ def to_paths(primitives: Iterable[Primitive]) -> Iterable[Path]:
 
 
 def to_meshes(primitives: Iterable[Primitive]) -> Iterable[MeshBuilder]:
-    """ Yields all :class:`~ezdxf.render.MeshBuilder` objects from the given
+    """Yields all :class:`~ezdxf.render.MeshBuilder` objects from the given
     `primitives`. Ignores primitives without a defined mesh.
 
     """
@@ -581,9 +593,8 @@ def to_meshes(primitives: Iterable[Primitive]) -> Iterable[MeshBuilder]:
             yield prim.mesh
 
 
-def to_control_vertices(primitives: Iterable[Primitive]) -> Iterable[
-    Vec3]:
-    """ Yields all path control vertices and all mesh vertices from the given
+def to_control_vertices(primitives: Iterable[Primitive]) -> Iterable[Vec3]:
+    """Yields all path control vertices and all mesh vertices from the given
     `primitives`. Like :func:`to_vertices`, but without flattening.
 
     """

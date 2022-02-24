@@ -34,7 +34,153 @@ line has the group code 1, each line can have a maximum line length of 255 bytes
 but BricsCAD (and AutoCAD?) store only 249 bytes in single line and one byte is
 not always one char.
 
-The text formatting is done by inline codes, see :class:`~ezdxf.entities.MText` class.
+
+Inline Code Specials
+--------------------
+
+The text formatting is done by inline codes, see the
+:class:`~ezdxf.entities.MText` class.
+
+Information gathered by implementing the :class:`MTextEditor` and the
+:class:`MTextParser` classes:
+
+- caret encoded characters:
+    - "^I" tabulator
+    - "^J" (LF) is a valid line break like "\\P"
+    - "^M" (CR) is ignored
+    - other characters render as empty square "▯"
+    - a space " " after the caret renders the caret glyph: "1^ 2" renders "1^2"
+
+- special encoded characters:
+    - "%%c" and "%%C" renders "Ø" (alt-0216)
+    - "%%d" and "%%D" renders "°" (alt-0176)
+    - "%%p" and "%%P" renders "±" (alt-0177)
+
+- Alignment command "\\A": argument "0", "1" or "2" is expected
+    - the terminator symbol ";" is optional
+    - the arguments "3", "4", "5", "6", "7", "8", "9" and "-" default to 0
+    - other characters terminate the command and will be printed: "\\AX", renders "X"
+
+- ACI color command "\\C": int argument is expected
+    - the terminator symbol ";" is optional
+    - a leading "-" or "+" terminates the command, "\\C+5" renders "\\C+5"
+    - arguments > 255, are ignored but consumed "\\C1000" renders nothing, not
+      even a "0"
+    - a trailing ";" after integers is always consumed, even for much to big
+      values, "\\C10000;" renders nothing
+
+- RGB color command "\\c": int argument is expected
+    - the terminator symbol ";" is optional
+    - a leading "-" or "+" terminates the command, "\\c+255" renders "\\c+255"
+    - arguments >= 16777216 are masked by: value & 0xFFFFFF
+    - a trailing ";" after integers is always consumed, even for much to big
+      values, "\\c9999999999;" renders nothing and switches the color to
+      yellow (255, 227, 11)
+
+- Height command "\\H" and "\\H...x": float argument is expected
+    - the terminator symbol ";" is optional
+    - a leading "-" is valid, but negative values are ignored
+    - a leading "+" is valid
+    - a leading "." is valid like "\\H.5x" for height factor 0.5
+    - exponential format is valid like "\\H1e2" for height factor 100 and
+      "\\H1e-2" for 0.01
+    - an invalid floating point value terminates the command,
+      "\\H1..5" renders "\\H1..5"
+
+- Other commands with floating point arguments like the height command:
+    - Width commands "\\W" and "\\W...x"
+    - Character tracking commands "\\T" and "\\T...x", negative values are used
+    - Slanting (oblique) command "\\Q"
+
+- Stacking command "\\S":
+    - build fractions: "numerator (upr)" + "stacking type char (t)" + "denominator (lwr)" + ";"
+    - divider chars: "^", "/" or "#"
+    - a space " " after the divider char "^" is mandatory to avoid caret
+      decoding: "\\S1^ 2;"
+    - the terminator symbol ";" is mandatory to end the command, all
+      chars beyond the "\\S" until the next ";" or the end of the string
+      are part of the fraction
+    - backslash escape "\\;" to render the terminator char
+    - a space " " after the divider chars "/" and "#" is rendered as space " "
+      in front of the denominator
+    - the numerator and denominator can contain spaces
+    - backslashes "\\" inside the stacking command are ignored (except "\\;")
+      "\\S\\N^ \\P" render "N" over "P", therefore property changes (color, text
+      height, ...) are not possible inside the stacking command
+    - grouping chars "{" and "}" render as simple curly braces
+    - caret encoded chars are decoded "^I", "^J", "^M", but render as a simple
+      space " " or as the replacement char "▯" plus a space
+    - a divider char after the first divider char, renders as the char itself:
+      "\\S1/2/3" renders the horizontal fraction "1" / "2/3"
+
+- Font command "\\f" and "\\F": export only "\\f", parse both, "\\F" ignores some arguments
+    - the terminator symbol ";" is mandatory to end the command, all
+      chars beyond the "\\f" until the next ";" or the end of the string
+      are part of the command
+    - the command arguments are separated by the pipe char "|"
+    - arguments: "font family name" | "bold" | "italic" | "codepage" | "pitch";
+      example "\\fArial|b0|i0|c0|p0;"
+    - only the "font family name" argument is required, fonts which are not
+      available on the system are replaced by the "TXT.SHX" shape font
+    - the "font family name" is the font name shown in font selection widgets in
+      desktop applications
+    - "b1" to use the bold font style, any other second char is interpreted as "non bold"
+    - "i1" to use an italic font style, any other second char is interpreted as "non italic"
+    - "c???" change codepage, "c0" use the default codepage, because of the age
+      of unicode no further investigations, also seems to be ignored by AutoCAD
+      and BricsCAD
+    - "p???" change pitch size, "p0" means don't change, ignored by AutoCAD and
+      BricsCAD, to change the text height use the "\\H" command
+    - the order is not important, but export always in the shown order:
+      "\\fArial|b0|i0;" the arguments "c0" and "p0" are not required
+
+- Paragraph properties command "\\p"
+    - the terminator symbol ";" is mandatory to end the command, all
+      chars beyond the "\\p" until the next ";" or the end of the string
+      are part of the command
+    - the command arguments are separated by commas ","
+    - all values are factors for the initial char height of the MTEXT entity,
+      example: char height = 2.5, "\\pl1;" set the left paragraph indentation
+      to 1 x 2.5 = 2.5 drawing units.
+    - all values are floating point values, see height command
+    - arguments are "i", "l", "r", "q", "t"
+    - a "\*" as argument value, resets the argument to the initial value: "i0",
+      "l0", "r0", the "q" argument most likely depends on the text direction;
+      I haven't seen "t\*". The sequence used by BricsCAD to reset all values
+      is ``"\pi*,l*,r*,q*,t;"``
+    - "i" indentation of the first line relative to the "l" argument as floating
+      point value, "\\pi1.5"
+    - "l" left paragraph indentation as floating point value, "\\pl1.5"
+    - "r" right paragraph indentation as floating point value, "\\pr1.5"
+    - "x" is required if a "q" or a "t" argument is present, the placement of
+      the "x" has no obvious rules
+    - "q" paragraph alignment
+
+        - "ql" left paragraph alignment
+        - "qr" right paragraph alignment
+        - "qc" center paragraph alignment
+        - "qj" justified paragraph alignment
+        - "qd" distributed paragraph alignment
+
+    - "t" tabulator stops as comma separated list, the default tabulator stops
+      are located at 4, 8, 12, ..., by defining at least one tabulator stop,
+      the default tabulator stops wil be ignored.
+      There 3 kind of tabulator stops: left, right and center adjusted stops,
+      e.g. "\pxt1,r5,c8":
+
+        - a left adjusted stop has no leading char, two left adjusted stops "\\pxt1,2;"
+        - a right adjusted stop has a preceding "r" char, "\\pxtr1,r2;"
+        - a center adjusted stop has a preceding "c" char, "\\pxtc1,c2;"
+
+      complex example to create a numbered list with two items:
+      ``"pxi-3,l4t4;1.^Ifirst item\P2.^Isecond item"``
+    - a parser should be very flexible, I have seen several different orders of
+      the arguments and placing the sometimes required "x" has no obvious rules.
+    - exporting seems to be safe to follow these three rules:
+
+        1. the command starts with "\\px", the "x" does no harm, if not required
+        2. argument order "i", "l", "r", "q", "t", any of the arguments can be left off
+        3. terminate the command with a ";"
 
 Height Calculation
 ------------------
@@ -50,6 +196,12 @@ rendered text content.
 
 The only way to calculate the MTEXT height is to replicate the rendering
 results of AutoCAD/BricsCAD by implementing a rendering engine for MTEXT.
+
+In column mode the MTEXT height is stored for every column for DXF version
+before R2018. In DXF R2018+ the column heights are only stored if
+:attr:`MTextColumns.auto_height` is ``False``. If :attr:`MTextColumns.auto_height`
+is ``True``. But DXF R2018+ stores the MTEXT total width and height
+in explicit attributes.
 
 Width Calculation
 -----------------
@@ -123,6 +275,51 @@ Columns with background color:
     :align: center
     :width: 800px
 
+Text Frame
+----------
+
+The MTEXT entity can have a text frame only, without a background filling,
+group code 90 has value 16. In this case all other background related tags
+are removed (45, 63, 421, 431, 441) and the scaling factor is 1.5 by default.
+
+XDATA for Text Frame
+++++++++++++++++++++
+
+This XDATA exist only if the text frame flag in group code 90 is set and for
+DXF version < R2018!
+
+.. code-block:: Text
+
+    ...  <snip>
+    1001 <ctrl> ACAD
+    1000 <str> ACAD_MTEXT_TEXT_BORDERS_BEGIN
+    1070 <int> 80       <<< group code for repeated flags
+    1070 <int> 16       <<< repeated group code 90?
+    1070 <int> 46       <<< group code for scaling factor, which is fixed?
+    1040 <float> 1.5    <<< scaling factor
+    1070 <int> 81       <<< group code for repeated flow direction?
+    1070 <int> 1        <<< flow direction?
+    1070 <int> 5        <<< group code for a handle, multiple entries possible
+    1005 <hex> #A8      <<< handle to the LWPOLYLINE text frame
+    1070 <int> 5        <<< group code for next handle
+    1005 <hex> #A9      <<< next handle
+    ...
+    1000 <str> ACAD_MTEXT_TEXT_BORDERS_END
+
+Extra LWPOLYLINE Entity as Text Frame
++++++++++++++++++++++++++++++++++++++
+
+The newer versions of AutoCAD and BricsCAD get all the information they need
+from the MTEXT entity, but it seems that older versions could not handle the
+text frame property correct. Therefore AutoCAD and BricsCAD create a separated
+LWPOLYLINE entity for the text frame for DXF versions < R2018.
+The handle to this text frame entity is stored in the XDATA as group code 1005,
+see section above.
+
+Because this LWPOLYLINE is not required *ezdxf* does **not** create such a text
+frame entity nor the associated XDATA and *ezdxf* also **removes** this data
+from loaded DXF files at the second loading stage.
+
 Column Support
 --------------
 
@@ -171,6 +368,30 @@ Dynamic (manual height) same as the dynamic (auto height) type, but each column
                         can have an individual height.
 No column               A regular MTEXT with "defined column height" attribute?
 ======================= ========================================================
+
+=============== =============== =========== ===============
+Column Type     Defined Height  Auto Height Column Heights
+=============== =============== =========== ===============
+Static          stored          False       not stored
+Dynamic auto    stored          True        not stored
+Dynamic manual  not stored      False       stored (last=0)
+=============== =============== =========== ===============
+
+Column Count
+++++++++++++
+
+For DXF versions < R2018 the column count is always given by the count of linked
+MTEXT columns. Caution: the column count stored in the XDATA section by group
+code 76 may not match the count of linked MTEXT entities and AutoCAD is OK with
+that!
+In DXF R2018+ this property is not available, because there are
+no linked MTEXT entities anymore.
+
+R2018+: For the column types "static" and "dynamic manual" the correct column
+count is stored as group code 72. For the column type "dynamic auto" the stored
+*column count is 0*. It is possible to calculate the column count
+from the total width and the column width if the total width is correct like in
+AutoCAD and BricsCAD.
 
 Static Columns R2000
 ++++++++++++++++++++

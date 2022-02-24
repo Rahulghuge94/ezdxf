@@ -17,9 +17,8 @@ Add-ons
     r12writer
     odafc
     text2path
+    mtxpl
     pycsg
     acadctb
     forms
-
-
-
+    binpacking

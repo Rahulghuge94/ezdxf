@@ -5,10 +5,8 @@ Add-ons
 -------
 
 - drawing
-    - (v0.17) MLEADER full rendering support, requires `MLeader.virtual_entities()`
-    - (v0.17) add support for ATTRIB with embedded MTEXT
-    - (v0.17) global fonts cache usage
-    - (>v1.0) ACAD_TABLE
+  - (>v1.0) support for switching plot styles (DXF_DEFAULT_PAPERSPACE_COLORS)
+  - (>v1.0) VIEWPORT rendering support?
   
 - (>v1.0) Native SVG exporter, planned after the matplotlib backend supports 
   all v1.0 features. 
@@ -27,7 +25,7 @@ Add-ons
   - Reportlab: more report or magazine page layout oriented
   - PyQt: QPrinter & QPainter - https://wiki.qt.io/Handling_PDF
   
-  In consideration, if then SVG exporter works well.
+  In consideration, if the SVG exporter works well.
     
 - (>v1.0) DWG loader, planned for the future. Cython will be required for the 
   low level stuff, no pure Python implementation.
@@ -35,58 +33,63 @@ Add-ons
 Render Tools
 ------------
 
-- (v0.17) `MLeader.virtual_entities()` 
-- (v0.17) `EulerSpiral()` conversion to B-spline with end tangent constraints
-- (v0.17) Text layout engine for better MTEXT rendering support by the 
-  `drawing` add-on and exploding MTEXT into DXF primitives (TEXT & LINE).
-- (<v1.0) DIMENSION rendering
-    - angular dim
-    - angular 3 point dim
-    - ordinate dim
-    - arc dim
-- (>v1.0) `ACADTable.virtual_entities()`, requires basic ACAD_TABLE support
+- (>v1.0) ACAD_TABLE tool to render content as DXF primitives to create the 
+  content of the anonymous block `*T...`
+- (>v1.0) factory methods to create ACAD_TABLE entities
+- (>v1.0) fix LWPOLYLINE parsing error in ProxyGraphic, see test script 239
+- (>v1.0) tool to create proxy graphic 
+
 
 DXF Entities
 ------------
 
-- (v0.17) MLEADER: factory methods to create new MLEADER entities  
-- (v0.17) ATTRIB/ATTDEF support for embedded MTEXT entity,
-  example: `dxftest/attrib_attdef_with_embedded_mtext.dxf`
-- (v0.17) Remove generic "Embedded Object" support in DXFEntity because this is 
-  always a special case which should be handled by DXF load/export procedure, 
-  and it is used only by ATTRIB/ATTDEF/MTEXT yet.
-- (v0.17) MTEXT: multi column support and exploding into DXF primitives
+- (>v1.0) ACAD_TABLE entity load and export support beyond `AcadTableBlockContent`
+- (>v1.0) ACAD_TABLE tool to manage content at table and cell basis
+- (>v1.0) GEODATA version 1 support, see mpolygon examples and DXF reference R2009
 - (>v1.0) FIELD, used by ACAD_TABLE and MTEXT
-- (>v1.0) ACAD_TABLE
 
 DXF Document
 ------------
 
 - (>v1.0) `doc.to_dxf_r12()`: convert the whole DXF document into DXF R12. 
-  This is a destructive process, which converts MTEXT to TEXT, 
-  MESH to PolyFaceMesh, LWPOLYLINE into POLYLINE, flatten SPLINE into 
-  POLYLINE ..., and removes all entities not supported by DXF R12 
-  like TABLE, ACIS entities, ...
+  This is a destructive process, which converts or explodes DXF entities:
   
-- (>v1.0) Optimize DXF export: write tags direct in export_entity() 
-  without any indirections, this requires some additional tag writing 
-  function in the Tagwriter() class, these additional functions should only use 
-  methods from AbstractTagwriter():
-  - write_tag2_skip_default(code, value, default)
-  - write_vertex_2d(code, value, default) write explicit 2D vertices and 
-    skip default value if given
-  - a check function for tags containing user strings (line breaks!)
-  
-DXF Audit & Repair
-------------------
+  - explode MTEXT, MULTILEADER, MLINE, ACAD_TABLE, ARC_DIMENSION
+  - convert MESH to PolyFaceMesh
+  - convert LWPOLYLINE into 2D polyline
+  - flatten SPLINE into a 3D polyline
+  - flatten ELLIPSE into a 3D polyline
 
-- (v0.17) Standalone ATTRIBS are not allowed in model space (also paper space- 
-  and block layout?). Important for exploding INSERT entities with ATTRIBS, 
-  the current implementation already convert ATTRIB to TEXT. 
-  BricsCAD removes them and TrueView crashes, more testing is required. 
-- (v0.17) Remove invalid standalone ATTRIB/ATTDEF entities
-- (<v1.0) check DIMENSION
-  - overridden properties in XDATA have to be checked!
-  - dimstyle exist; repair: set to 'Standard'
-  - arrows exist; repair: set to '' = default open filled arrow
-  - text style exist; repair: set to 'Standard'
+  Removes all data not supported by DXF R12:
+  - all ACIS based entities 
+  - HATCH and MPOLYGON entities
+  - IMAGE and UNDERLAY entities
+  - XLINE and RAY entities
+  - OBJECTS and the CLASSES sections
+  - all but the first paper space layout
+
+- (>v1.0) core module `ezdxf.xref` as replacement for the `Importer` add-on
+  - AutoCAD does not support DXF as XREF objects!
+  - ezdxf will only support DXF as XREF objects, use the `odafc` add-on to convert 
+    DWG to DXF
+  - has to be much more versatile than the current `Importer` add-on otherwise 
+    just improve and extend the `Importer` add-on 
+  - resource management like CAD applications, e.g. layer names of xrefs: 
+    <dwg-name>$0$layername
+  - `xref.bind(xref_block)`: convert a XREF into a common BLOCK, this replaces 
+    the model space import of the `Importer` add-on
+  - `xref.attach(doc, "xref_filename.dxf")`, replaces `Drawing.add_xref_def()`
+  - `xmgr = xref.XRefManager(source_doc, target_doc)`
+  - `xmgr.import_modelspace()` import all modelspace entities
+  - `xmgr.import_entities(entities)` import selected entities
+  - modify entities on import (transform, change DXF properties)
+  - `xmgr.import_block("block_name")`
+  - `xmgr.import_resources(resource_desc)`
+  - `xmgr.import_paperspace("layout_name")` ???
+  - `xmgr.finalize()`
+  
+Documentation
+-------------
+
+- Basic concept & tutorial: Text styling (TEXT, ATTRIB, ATTDEF, MTEXT)
+- Tutorial for POLYFACE

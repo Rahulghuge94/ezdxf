@@ -4,8 +4,18 @@ import pytest
 import random
 
 from ezdxf.math import (
-    cubic_bezier_interpolation, Vec3, Bezier3P, quadratic_to_cubic_bezier,
-    Bezier4P, have_bezier_curves_g1_continuity, bezier_to_bspline,
+    cubic_bezier_interpolation,
+    Vec3,
+    Vec2,
+    Bezier3P,
+    quadratic_to_cubic_bezier,
+    Bezier4P,
+    have_bezier_curves_g1_continuity,
+    bezier_to_bspline,
+    split_bezier,
+    quadratic_bezier_from_3p,
+    cubic_bezier_from_3p,
+    close_vectors,
 )
 
 
@@ -69,10 +79,12 @@ B5 = Bezier4P([(4, 0), (5, -1), (6, -1), (7, 0)])
 def test_g1_continuity_for_bezier_curves():
     assert have_bezier_curves_g1_continuity(B1, B2) is True
     assert have_bezier_curves_g1_continuity(B1, B3) is False
-    assert have_bezier_curves_g1_continuity(B1, B4, g1_tol=1e-4) is False, \
-        "should be outside of tolerance "
-    assert have_bezier_curves_g1_continuity(B1, B5) is False, \
-        "end- and start point should match"
+    assert (
+        have_bezier_curves_g1_continuity(B1, B4, g1_tol=1e-4) is False
+    ), "should be outside of tolerance "
+    assert (
+        have_bezier_curves_g1_continuity(B1, B5) is False
+    ), "end- and start point should match"
 
 
 D1 = Bezier4P([(0, 0), (1, 1), (3, 0), (3, 0)])
@@ -85,17 +97,21 @@ def test_g1_continuity_for_degenerated_bezier_curves():
     assert have_bezier_curves_g1_continuity(D1, D2) is False
 
 
-@pytest.mark.parametrize('curve', [D1, D2])
+@pytest.mark.parametrize("curve", [D1, D2])
 def test_flatten_degenerated_bezier_curves(curve):
     # Degenerated Bezier curves behave like regular curves!
     assert len(list(curve.flattening(0.1))) > 4
 
 
-@pytest.mark.parametrize("b1,b2", [
-    (B1, B2),  # G1 continuity, the common case
-    (B1, B3),  # without G1 continuity is also a regular B-spline
-    (B1, B5),  # regular B-spline, but first control point of B5 is lost
-], ids=["G1", "without G1", "gap"])
+@pytest.mark.parametrize(
+    "b1,b2",
+    [
+        (B1, B2),  # G1 continuity, the common case
+        (B1, B3),  # without G1 continuity is also a regular B-spline
+        (B1, B5),  # regular B-spline, but first control point of B5 is lost
+    ],
+    ids=["G1", "without G1", "gap"],
+)
 def test_bezier_curves_to_bspline(b1, b2):
     bspline = bezier_to_bspline([b1, b2])
     # Remove duplicate control point between two adjacent curves:
@@ -126,3 +142,46 @@ def test_quality_of_bezier_to_bspline_conversion_2():
 def test_bezier_curves_to_bspline_error():
     with pytest.raises(ValueError):
         bezier_to_bspline([])  # one or more curves expected
+
+
+class TestSplitBezier:
+    @pytest.fixture
+    def points3(self):
+        return Vec2.list([(0, 0), (0, 1), (1.5, 0.75), (2, 2)])
+
+    @pytest.mark.parametrize("t", [-1, 2])
+    def test_t_validation(self, points3, t):
+        with pytest.raises(ValueError):
+            split_bezier(points3, t)
+
+    def test_control_point_validation(self):
+        with pytest.raises(ValueError):
+            split_bezier([Vec2(0, 0)], 0.5)
+
+    def test_split_cubic_bezier(self, points3):
+        left, right = split_bezier(points3, 0.5)
+        assert (
+            close_vectors(
+                left,
+                [(0.0, 0.0), (0.0, 0.5), (0.375, 0.6875), (0.8125, 0.90625)],
+            )
+            is True
+        )
+
+        assert (
+            close_vectors(
+                right,
+                [(2.0, 2.0), (1.75, 1.375), (1.25, 1.125), (0.8125, 0.90625)],
+            )
+            is True
+        )
+
+
+def test_quadratic_bezier_from_3_points():
+    qbez = quadratic_bezier_from_3p((0, 0), (3, 2), (6, 0))
+    assert qbez.point(0.5).isclose((3, 2))
+
+
+def test_cubic_bezier_from_3_points():
+    cbez = quadratic_bezier_from_3p((0, 0), (3, 2), (6, 0))
+    assert cbez.point(0.5).isclose((3, 2))

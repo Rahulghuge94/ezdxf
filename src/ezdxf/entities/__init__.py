@@ -1,17 +1,15 @@
-# Copyright (c) 2019-2020 Manfred Moitzi
+# Copyright (c) 2019-2021 Manfred Moitzi
 # License: MIT License
-# Created 2019-02-13
 
-# first factory
 from . import factory
 
 # basic classes
 from .xdict import ExtensionDict
-from .xdata import XData, EmbeddedObjects
+from .xdata import XData
 from .appdata import AppData, Reactors
-from .dxfentity import DXFEntity
-from .dxfgfx import DXFGraphic, SeqEnd
-from .dxfobj import DXFObject
+from .dxfentity import DXFEntity, DXFTagStorage
+from .dxfgfx import DXFGraphic, SeqEnd, is_graphic_entity, get_font_name
+from .dxfobj import DXFObject, is_dxf_object
 from .dxfns import DXFNamespace, SubclassProcessor
 
 # register management structures
@@ -25,17 +23,19 @@ from .textstyle import Textstyle
 from .dimstyle import DimStyle
 from .view import View
 from .vport import VPort
-from .ucs import UCSTable
+from .ucs import UCSTableEntry
 from .appid import AppID
 from .blockrecord import BlockRecord
 
 # register DXF objects R2000
+from .acad_proxy_entity import ACADProxyEntity
 from .dxfobj import XRecord, Placeholder, VBAProject, SortEntsTable
 from .dictionary import Dictionary, DictionaryVar, DictionaryWithDefault
 from .layout import DXFLayout
 from .idbuffer import IDBuffer
 from .sun import Sun
 from .material import Material, MaterialCollection
+from .oleframe import OLE2Frame
 
 # register DXF objects R2007
 from .visualstyle import VisualStyle
@@ -53,7 +53,7 @@ from .insert import Insert
 from .block import Block, EndBlk
 from .polyline import Polyline, Polyface, Polymesh, MeshVertexCache
 from .attrib import Attrib, AttDef, copy_attrib_as_text
-from .dimension import Dimension, ArcDimension
+from .dimension import *
 from .dimstyleoverride import DimStyleOverride
 from .viewport import Viewport
 
@@ -62,32 +62,44 @@ from .lwpolyline import LWPolyline
 from .ellipse import Ellipse
 from .xline import XLine, Ray
 from .mtext import MText
+from .mtext_columns import *
 from .spline import Spline
 from .mesh import Mesh, MeshData
-from .hatch import (
-    Hatch, BoundaryPaths, PolylinePath, EdgePath, LineEdge,
-    ArcEdge, EllipseEdge, SplineEdge, Pattern, PatternLine, Gradient,
-)
+from .boundary_paths import *
+from .gradient import *
+from .pattern import *
+from .hatch import *
+from .mpolygon import MPolygon
 from .image import Image, ImageDef, Wipeout
 from .underlay import (
-    Underlay, UnderlayDefinition, PdfUnderlay, DgnUnderlay,
+    Underlay,
+    UnderlayDefinition,
+    PdfUnderlay,
+    DgnUnderlay,
     DwfUnderlay,
 )
 from .leader import Leader
 from .tolerance import Tolerance
 from .helix import Helix
 from .acis import (
-    Body, Solid3d, Region, Surface, ExtrudedSurface,
-    LoftedSurface, RevolvedSurface, SweptSurface,
+    Body,
+    Solid3d,
+    Region,
+    Surface,
+    ExtrudedSurface,
+    LoftedSurface,
+    RevolvedSurface,
+    SweptSurface,
 )
 from .mline import MLine, MLineVertex, MLineStyle, MLineStyleCollection
-from .mleader import MLeader, MLeaderStyle, MLeaderStyleCollection
+from .mleader import MLeader, MLeaderStyle, MLeaderStyleCollection, MultiLeader
 
 # register graphical entities R2004
 
 # register graphical entities R2007
 
 from .light import Light
+from .acad_table import AcadTableBlockContent
 
 # register graphical entities R2010
 

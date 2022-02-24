@@ -66,6 +66,8 @@ BaseLayout
 
     .. automethod:: unlink_entity
 
+    .. automethod:: purge
+
     .. automethod:: query(query: str = '*') -> EntityQuery
 
     .. automethod:: groupby
@@ -98,8 +100,6 @@ BaseLayout
 
     .. automethod:: add_auto_blockref
 
-    .. automethod:: add_attrib
-
     .. automethod:: add_attdef
 
     .. automethod:: add_polyline2d
@@ -115,6 +115,12 @@ BaseLayout
     .. automethod:: add_lwpolyline
 
     .. automethod:: add_mtext
+
+    .. automethod:: add_mtext_static_columns
+
+    .. automethod:: add_mtext_dynamic_manual_height_columns
+
+    .. automethod:: add_mtext_dynamic_auto_height_columns
 
     .. automethod:: add_ray
 
@@ -133,6 +139,8 @@ BaseLayout
     .. automethod:: add_rational_spline
 
     .. automethod:: add_hatch
+
+    .. automethod:: add_mpolygon
 
     .. automethod:: add_mesh
 
@@ -158,7 +166,31 @@ BaseLayout
 
     .. automethod:: add_diameter_dim_2p
 
+    .. automethod:: add_angular_dim_2l
+
+    .. automethod:: add_angular_dim_3p
+
+    .. automethod:: add_angular_dim_cra
+
+    .. automethod:: add_angular_dim_arc
+
+    .. automethod:: add_arc_dim_3p
+
+    .. automethod:: add_arc_dim_cra
+
+    .. automethod:: add_arc_dim_arc
+
+    .. automethod:: add_ordinate_dim
+
+    .. automethod:: add_ordinate_x_dim
+
+    .. automethod:: add_ordinate_y_dim
+
     .. automethod:: add_leader
+
+    .. automethod:: add_multileader_mtext
+
+    .. automethod:: add_multileader_block
 
     .. automethod:: add_body
 
@@ -289,19 +321,19 @@ BlockLayout
     :class:`~ezdxf.entities.Insert` entities. Each reference can be placed, scaled and rotated individually and can
     have it's own set of DXF :class:`~ezdxf.entities.Attrib` entities attached.
 
-    .. attribute:: name
+    .. autoproperty:: name
 
-       name of the associated BLOCK and BLOCK_RECORD entities.
+    .. autoproperty:: block
 
-    .. autoattribute:: block
+    .. autoproperty:: endblk
 
-    .. autoattribute:: endblk
+    .. autoproperty:: dxf
 
-    .. autoattribute:: dxf
+    .. autoproperty:: can_explode
 
-    .. autoattribute:: can_explode
+    .. autoproperty:: scale_uniformly
 
-    .. autoattribute:: scale_uniformly
+    .. autoproperty:: base_point
 
     .. automethod:: __contains__
 

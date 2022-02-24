@@ -21,14 +21,6 @@ def test_equal():
     p2 = Plane.from_vector((5, 0, 0))
     assert p1 is not p2
     assert p1 == p1
-    with pytest.raises(TypeError):
-        p1 == Vec3(5, 0, 0)
-    with pytest.raises(TypeError):
-        p1 != Vec3(5, 0, 0)
-    with pytest.raises(TypeError):
-        p1 == 5
-    with pytest.raises(TypeError):
-        p1 != 5
 
 
 def test_init_form_vector():
@@ -64,5 +56,5 @@ def test_is_coplanar_plane():
     assert p1.is_coplanar_plane(p2) is True
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pytest.main([__file__])

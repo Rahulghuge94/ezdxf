@@ -14,12 +14,14 @@ Quick-Info
 ----------
 
 - ezdxf is a Python package to create new DXF files and read/modify/write existing DXF files
-- the intended audience are developers
+- the intended audience are programmers
 - requires at least Python 3.7
 - OS independent
 - tested with CPython and pypy3
 - C-extensions for CPython as binary wheels available on PyPI for Windows, Linux and macOS
-- additional required packages: [pyparsing](https://pypi.org/project/pyparsing/) 
+- additional required packages: 
+  [typing_extensions](https://pypi.org/project/typing-extensions/), 
+  [pyparsing](https://pypi.org/project/pyparsing/) 
 - optional Cython implementation of some low level math classes
 - MIT-License
 - read/write/new support for DXF versions: R12, R2000, R2004, R2007, R2010, R2013 and R2018
@@ -41,39 +43,41 @@ Included Extensions
 - `Importer` add-on to import entities, blocks and table entries from another DXF document
 - `dxf2code` add-on to generate Python code for DXF structures loaded from DXF 
   documents as starting point for parametric DXF entity creation
-- Plot Style Files (CTB/STB) read/write add-on
+- `acadctb` add-on to read/write plot style files (CTB/STB)
+- `pycsg` add-on for Constructive Solid Geometry (CSG) modeling technique
+- `MTextExplode` add-on for exploding MTEXT entities into single line TEXT entities 
 
 A simple example:
 
-```python
+```Python
 import ezdxf
 
 # Create a new DXF document.
-doc = ezdxf.new(dxfversion='R2010')
+doc = ezdxf.new(dxfversion="R2010")
 
 # Create new table entries (layers, linetypes, text styles, ...).
-doc.layers.new('TEXTLAYER', dxfattribs={'color': 2})
+doc.layers.add("TEXTLAYER", color=2)
 
 # DXF entities (LINE, TEXT, ...) reside in a layout (modelspace, 
 # paperspace layout or block definition).  
 msp = doc.modelspace()
 
 # Add entities to a layout by factory methods: layout.add_...() 
-msp.add_line((0, 0), (10, 0), dxfattribs={'color': 7})
+msp.add_line((0, 0), (10, 0), dxfattribs={"color": 7})
 msp.add_text(
-    'Test', 
+    "Test", 
     dxfattribs={
-        'layer': 'TEXTLAYER'
-    }).set_pos((0, 0.2), align='CENTER')
+        "layer": "TEXTLAYER"
+    }).set_pos((0, 0.2), align="CENTER")
 
-# Save DXF document.
-doc.saveas('test.dxf')
+# Save the DXF document.
+doc.saveas("test.dxf")
 ```
 
 Example for the *r12writer*, which writes a simple DXF R12 file without 
 in-memory structures:
 
-```python
+```Python
 from random import random
 from ezdxf.addons import r12writer
 

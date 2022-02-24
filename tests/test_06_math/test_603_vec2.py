@@ -3,6 +3,7 @@
 import pytest
 import math
 import pickle
+
 # Import from 'ezdxf.math._vector' to test Python implementation
 from ezdxf.math._vector import Vec2, Vec3
 from ezdxf.acc import USE_C_EXT
@@ -33,6 +34,12 @@ def test_init_tuple(vcls):
     v = vcls((2, 3))
     assert v.x == 2
     assert v.y == 3
+
+
+def test_empty_init(vcls):
+    v = vcls()
+    assert v.x == 0.
+    assert v.y == 0.
 
 
 def test_init_vec2(vcls):
@@ -66,9 +73,10 @@ def test_round(vec2):
 
 def test_from_angle(vcls):
     angle = math.radians(50)
-    length = 3.
+    length = 3.0
     assert vcls.from_angle(angle, length) == vcls(
-        (math.cos(angle) * length, math.sin(angle) * length))
+        (math.cos(angle) * length, math.sin(angle) * length)
+    )
 
 
 def test_vec2_as_tuple(vec2):
@@ -132,6 +140,14 @@ def test_is_null(vcls):
     v1 = vcls(23.56678, 56678.56778) * (1.0 / 14.5667)
     v2 = vcls(23.56678, 56678.56778) / 14.5667
     assert (v2 - v1).is_null
+
+
+def test_is_not_null_default_abs_tol(vcls):
+    assert vcls(1e-11, 0).is_null is False
+
+
+def test_is_null_default_abs_tol(vcls):
+    assert vcls(1e-12, 0).is_null is True
 
 
 def test_bool(vcls):
@@ -312,11 +328,14 @@ def test_angle_between(vcls):
     assert math.isclose(angle, math.pi / 4)
 
 
-@pytest.mark.parametrize('v1, v2', [
-    [(1, 0), (0, 0)],
-    [(0, 0), (1, 0)],
-    [(0, 0), (0, 0)],
-])
+@pytest.mark.parametrize(
+    "v1, v2",
+    [
+        [(1, 0), (0, 0)],
+        [(0, 0), (1, 0)],
+        [(0, 0), (0, 0)],
+    ],
+)
 def test_angle_between_null_vector(vcls, v1, v2):
     with pytest.raises(ZeroDivisionError):
         vcls(v1).angle_between(vcls(v2))
@@ -333,13 +352,13 @@ def test_angle_between_outside_domain():
 
 
 def test_rotate(vcls):
-    assert vcls(2, 2).rotate_deg(90) == (-2, 2)
+    assert vcls(2, 2).rotate_deg(90).isclose(vcls(-2, 2))
 
 
 def test_lerp(vcls):
     v1 = vcls(1, 1)
     v2 = vcls(4, 4)
-    assert v1.lerp(v2, .5) == (2.5, 2.5)
+    assert v1.lerp(v2, 0.5) == (2.5, 2.5)
     assert v1.lerp(v2, 0) == (1, 1)
     assert v1.lerp(v2, 1) == (4, 4)
 
@@ -351,7 +370,7 @@ def test_project(vcls):
     assert v.project(vcls(5, 5)) == (5, 0)
 
     v = vcls(10, 10)
-    assert v.project(vcls(10, 0)) == (5, 5)
+    assert v.project(vcls(10, 0)).isclose(vcls(5, 5))
 
 
 def test_det(vec2):

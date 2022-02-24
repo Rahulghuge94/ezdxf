@@ -8,7 +8,7 @@ import ezdxf
 from ezdxf import zoom, print_config
 from ezdxf.math import Matrix44
 from ezdxf.tools import fonts
-from ezdxf.tools import text_layout
+from ezdxf.tools import text_layout as tl
 
 """ 
 This example shows the usage of the internal text_layout module to render 
@@ -53,20 +53,23 @@ if not ezdxf.options.use_matplotlib:
     print("The Matplotlib package is required.")
     sys.exit(1)
 
-DIR = pathlib.Path('~/Desktop/Outbox').expanduser()
-STYLE = 'Style0'
-FONT = 'OpenSans-Regular.ttf'
-COLUMN_HEIGHT = 12
+# Type alias:
+Content = Iterable[tl.Cell]
+
+DIR = pathlib.Path("~/Desktop/Outbox").expanduser()
+STYLE = "Style0"
+FONT = "OpenSans-Regular.ttf"
+COLUMN_HEIGHT: float = 12
 
 print_config()
 
 doc = ezdxf.new()
 msp = doc.modelspace()
-style = doc.styles.new(STYLE, dxfattribs={'font': FONT})
+style = doc.styles.new(STYLE, dxfattribs={"font": FONT})
 
 
 def measure_space(font):
-    return font.text_width(' X') - font.text_width('X')
+    return font.text_width(" X") - font.text_width("X")
 
 
 class SizedFont:
@@ -88,8 +91,8 @@ fix_sized_fonts = [
 ]
 
 
-class FrameRenderer(text_layout.ContentRenderer):
-    """ Render object to render a frame around a content collection.
+class FrameRenderer(tl.ContentRenderer):
+    """Render object to render a frame around a content collection.
 
     This renderer can be used by collections which just manages content
     but do not represent a content by itself (Layout, Column, Paragraph).
@@ -99,47 +102,63 @@ class FrameRenderer(text_layout.ContentRenderer):
     def __init__(self, color):
         self.color = color
 
-    def render(self, left: float, bottom: float, right: float,
-               top: float, m: Matrix44 = None) -> None:
-        """ Render a frame as LWPOLYLINE. """
+    def render(
+        self,
+        left: float,
+        bottom: float,
+        right: float,
+        top: float,
+        m: Matrix44 = None,
+    ) -> None:
+        """Render a frame as LWPOLYLINE."""
         pline = msp.add_lwpolyline(
             [(left, top), (right, top), (right, bottom), (left, bottom)],
-            close=True, dxfattribs={'color': self.color},
+            close=True,
+            dxfattribs={"color": self.color},
         )
         if m:
             pline.transform(m)
 
-    def line(self, x1: float, y1: float, x2: float, y2: float,
-             m: Matrix44 = None) -> None:
-        """ Line renderer used to create underline, overline, strike through
+    def line(
+        self, x1: float, y1: float, x2: float, y2: float, m: Matrix44 = None
+    ) -> None:
+        """Line renderer used to create underline, overline, strike through
         and fraction dividers.
 
         """
-        line = msp.add_line((x1, y1), (x2, y2), dxfattribs={
-            'color': self.color})
+        line = msp.add_line(
+            (x1, y1), (x2, y2), dxfattribs={"color": self.color}
+        )
         if m:
             line.transform(m)
 
 
-class TextRenderer(text_layout.ContentRenderer):
-    """ Text content renderer. """
+class TextRenderer(tl.ContentRenderer):
+    """Text content renderer."""
 
     def __init__(self, text, attribs):
         self.text = text
         self.attribs = attribs
-        self.line_attribs = {'color': attribs['color']}
+        self.line_attribs = {"color": attribs["color"]}
 
-    def render(self, left: float, bottom: float, right: float,
-               top: float, m: Matrix44 = None):
-        """ Create/render the text content """
+    def render(
+        self,
+        left: float,
+        bottom: float,
+        right: float,
+        top: float,
+        m: Matrix44 = None,
+    ):
+        """Create/render the text content"""
         text = msp.add_text(self.text, dxfattribs=self.attribs)
-        text.set_pos((left, bottom), align='LEFT')
+        text.set_pos((left, bottom), align="LEFT")
         if m:
             text.transform(m)
 
-    def line(self, x1: float, y1: float, x2: float, y2: float,
-             m: Matrix44 = None) -> None:
-        """ Line renderer used to create underline, overline, strike through
+    def line(
+        self, x1: float, y1: float, x2: float, y2: float, m: Matrix44 = None
+    ) -> None:
+        """Line renderer used to create underline, overline, strike through
         and fraction dividers.
 
         """
@@ -148,15 +167,15 @@ class TextRenderer(text_layout.ContentRenderer):
             line.transform(m)
 
 
-class Word(text_layout.Text):
-    """ Represent a word as content box for the layout engine. """
+class Word(tl.Text):
+    """Represent a word as content box for the layout engine."""
 
     def __init__(self, text: str, font: SizedFont, stroke: int = 0):
         # Each content box can have individual properties:
         attribs = {
-            'color': random.choice((1, 2, 3, 4, 6, 7, 7)),
-            'height': font.height,
-            'style': STYLE,
+            "color": random.choice((1, 2, 3, 4, 6, 7, 7)),
+            "height": font.height,
+            "style": STYLE,
         }
         super().__init__(
             # Width and height of the content are fixed given values and will
@@ -169,24 +188,24 @@ class Word(text_layout.Text):
         )
 
 
-def uniform_content(count: int, size=1):
-    """ Create content with one text size. """
+def uniform_content(count: int, size: int = 1) -> Content:
+    """Create content with one text size."""
     font = fix_sized_fonts[size]
-    for word in text_layout.lorem_ipsum(count):
+    for word in tl.lorem_ipsum(count):
         yield Word(word, font)
-        yield text_layout.Space(font.space)
+        yield tl.Space(font.space)
 
 
-def random_sized_content(count: int):
-    """ Create content with randomized text size. """
+def random_sized_content(count: int) -> Content:
+    """Create content with randomized text size."""
 
     def size():
         return random.choice([0, 1, 1, 1, 1, 1, 2, 3])
 
-    for word in text_layout.lorem_ipsum(count):
+    for word in tl.lorem_ipsum(count):
         font = fix_sized_fonts[size()]
         yield Word(word, font)
-        yield text_layout.Space(font.space)
+        yield tl.Space(font.space)
 
 
 def stroke_groups(words: Iterable[str]):
@@ -208,13 +227,13 @@ def stroke_groups(words: Iterable[str]):
         yield group, stroke
 
 
-def stroked_content(count: int, size=1):
-    """ Create content with one text size and groups of words with or without
+def stroked_content(count: int, size: int = 1) -> Content:
+    """Create content with one text size and groups of words with or without
     strokes.
 
     """
     font = fix_sized_fonts[size]
-    groups = stroke_groups(text_layout.lorem_ipsum(count))
+    groups = stroke_groups(tl.lorem_ipsum(count))
     for group, stroke in groups:
         # strokes should span across spaces in between words:
         # Spaces between words are bound to the preceding content box renderer,
@@ -224,17 +243,14 @@ def stroked_content(count: int, size=1):
         continue_stroke = stroke + 8 if stroke else 0
         for word in group[:-1]:
             yield Word(word, font=font, stroke=continue_stroke)
-            yield text_layout.Space(font.space)
+            yield tl.Space(font.space)
         # strokes end at the last word, without continue stroke:
         yield Word(group[-1], font=font, stroke=stroke)
-        yield text_layout.Space(font.space)
+        yield tl.Space(font.space)
 
 
-Stacking = text_layout.Stacking
-
-
-class Fraction(text_layout.Fraction):
-    """ Represents a fraction for the layout engine, which consist of a top-
+class Fraction(tl.Fraction):
+    """Represents a fraction for the layout engine, which consist of a top-
     and bottom content box, divided by horizontal or slanted line.
     The "tolerance style" has no line between the stacked content boxes.
 
@@ -243,7 +259,9 @@ class Fraction(text_layout.Fraction):
 
     """
 
-    def __init__(self, t1: str, t2: str, stacking: Stacking, font: SizedFont):
+    def __init__(
+        self, t1: str, t2: str, stacking: tl.Stacking, font: SizedFont
+    ):
         top = Word(t1, font)
         bottom = Word(t2, font)
         super().__init__(
@@ -256,43 +274,44 @@ class Fraction(text_layout.Fraction):
         )
 
 
-def fraction_content():
-    """ Create content with one text size and place random fractions between
+def fraction_content() -> Content:
+    """Create content with one text size and place random fractions between
     words.
 
     """
     words = list(uniform_content(120))
     for word in words:
-        word.valign = text_layout.CellAlignment.BOTTOM
+        word.valign = tl.CellAlignment.BOTTOM
 
-    stacking_options = [Stacking.OVER, Stacking.LINE, Stacking.SLANTED]
+    stacking_options = list(tl.Stacking)
     font = SizedFont(0.25)  # fraction font
     for _ in range(10):
         stacking = random.choice(stacking_options)
         top = str(random.randint(1, 1000))
         bottom = str(random.randint(1, 1000))
         pos = random.randint(0, len(words) - 1)
-        if isinstance(words[pos], text_layout.Space):
+        if isinstance(words[pos], tl.Space):
             pos += 1
         words.insert(pos, Fraction(top, bottom, stacking, font))
-        words.insert(pos + 1, text_layout.Space(font.space))
+        words.insert(pos + 1, tl.Space(font.space))
     return words
 
 
-def create_layout(align, content):
+def create_layout(align: tl.ParagraphAlignment, content: Content) -> tl.Layout:
     # Create a flow text paragraph for the content:
-    paragraph = text_layout.FlowText(align=align)
+    paragraph = tl.Paragraph(align=align)
     paragraph.append_content(content)
 
     # Start the layout engine and set default column width:
-    layout = text_layout.Layout(
+    layout = tl.Layout(
         width=8,  # default column width for columns without define width
         margins=(0.5,),  # space around the layout
         # The render object of collections like Layout, Column or Paragraph is
         # called before the render objects of the content managed by the
         # collection.
         # This could be used to render a frame or a background:
-        renderer=FrameRenderer(color=2))
+        renderer=FrameRenderer(color=2),
+    )
 
     # Append the first column with default width and a content height of 12 drawing
     # units. At least the first column has to be created by the client.
@@ -321,25 +340,16 @@ def create_layout(align, content):
     # transformation matrix to move the layout to the final location in
     # the DXF target layout - the model space in this example.
     # Set final layout location in the xy-plane with alignment:
-    layout.place(align=text_layout.LayoutAlignment.BOTTOM_LEFT)
+    layout.place(align=tl.LayoutAlignment.BOTTOM_LEFT)
 
     # It is possible to add content after calling place(), but place has to be
     # called again before calling the render() method of the layout.
     return layout
 
 
-FlowTextAlignment = text_layout.FlowTextAlignment
-ALIGNMENTS = [
-    FlowTextAlignment.LEFT,
-    FlowTextAlignment.RIGHT,
-    FlowTextAlignment.CENTER,
-    FlowTextAlignment.JUSTIFIED
-]
-
-
-def create(content, y):
-    x = 0
-    for align in ALIGNMENTS:
+def create(content: Content, y: float) -> None:
+    x: float = 0
+    for align in list(tl.ParagraphAlignment):
         # Build and place the layout at (0, 0):
         layout = create_layout(align, content)
         # Render and move the layout to the final location:
@@ -348,11 +358,12 @@ def create(content, y):
         x += layout.total_width + 2
 
 
-dy = COLUMN_HEIGHT + 3
+dy: float = COLUMN_HEIGHT + 3
 create(list(uniform_content(200)), 0)
 create(list(random_sized_content(200)), dy)
 create(list(stroked_content(200)), 2 * dy)
 create(fraction_content(), 3 * dy)
 
+# zooming needs the longest time:
 zoom.extents(msp, factor=1.1)
 doc.saveas(str(DIR / "text_layout.dxf"))

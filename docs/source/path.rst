@@ -53,11 +53,36 @@ only support 2D paths.
     Refactored the module :mod:`ezdxf.render.path` into the subpackage
     :mod:`ezdxf.path`.
 
+
 The usability of the :class:`Path` class expanded by the introduction
 of the reverse conversion from :class:`Path` to DXF entities (LWPOLYLINE,
 POLYLINE, LINE), and many other tools in `ezdxf` v0.16.
 To emphasize this new usability, the :class:`Path` class has got its own
 subpackage :mod:`ezdxf.path`.
+
+.. versionadded:: 0.17
+    Added the :meth:`Path.move_to` command and :term:`Multi-Path` support.
+
+.. glossary::
+
+    Empty-Path
+        Contains only a start point, the length of the path is 0 and the methods
+        :meth:`Path.approximate`, :meth:`Path.flattening` and
+        :meth:`Path.control_vertices` do not yield any vertices.
+
+    Single-Path
+        The :class:`Path` object contains only one path without gaps, the property
+        :attr:`Path.has_sub_paths` is ``False`` and the method
+        :meth:`Path.sub_paths` yields only this one path.
+
+    Multi-Path
+        The :class:`Path` object contains more than one path, the property
+        :attr:`Path.has_sub_paths` is ``True`` and the method
+        :meth:`Path.sub_paths` yields all paths within this object as single-path
+        objects. It is not possible to detect the orientation of a multi-path
+        object, therefore the methods :meth:`Path.has_clockwise_orientation`,
+        :meth:`Path.clockwise` and :meth:`Path.counter_clockwise` raise a
+        :class:`TypeError` exception.
 
 .. warning::
 
@@ -84,10 +109,7 @@ Functions to create :class:`Path` objects from other objects.
     - SOLID, TRACE, 3DFACE
     - IMAGE, WIPEOUT clipping path
     - VIEWPORT clipping path
-
-    The HATCH entity consist of multiple boundary paths and is not convertible
-    into a single :class:`Path` object and therefore not supported by this
-    function.
+    - HATCH as :term:`Multi-Path` object, new in v0.17
 
     :param entity: DXF entity
     :param segments: minimal count of cubic Bézier-curves for elliptical arcs
@@ -99,6 +121,9 @@ Functions to create :class:`Path` objects from other objects.
 
     .. versionadded:: 0.16
 
+    .. versionchanged:: 0.17
+        support for HATCH as :term:`Multi-Path` object
+
 
 .. autofunction:: from_hatch(hatch: Hatch) -> Iterable[Path]
 
@@ -106,7 +131,11 @@ Functions to create :class:`Path` objects from other objects.
 
 .. autofunction:: from_matplotlib_path(mpath, curves=True) -> Iterable[Path]
 
+.. autofunction:: multi_path_from_matplotlib_path(mpath, curves=True) -> Path
+
 .. autofunction:: from_qpainter_path(qpath) -> Iterable[Path]
+
+.. autofunction:: multi_path_from_qpainter_path(qpath) -> Path
 
 Render Functions
 ----------------
@@ -119,6 +148,8 @@ paperspace layout or a block definition.
 .. autofunction:: render_polylines2d(layout: Layout, paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, extrusion: Vertex = (0, 0, 1),  dxfattribs: Dict = None) -> EntityQuery
 
 .. autofunction:: render_hatches(layout: Layout, paths: Iterable[Path], *, edge_path = True, distance: float = 0.01, segments: int = 4, g1_tol: float = 1e-4, extrusion: Vertex = (0, 0, 1),  dxfattribs: Dict = None) -> EntityQuery
+
+.. autofunction:: render_mpolygons(layout: Layout, paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, extrusion: Vertex = (0, 0, 1),  dxfattribs: Dict = None) -> EntityQuery
 
 .. autofunction:: render_polylines3d(layout: Layout, paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, dxfattribs: Dict = None) -> EntityQuery
 
@@ -137,6 +168,8 @@ Functions to create DXF entities from paths.
 
 .. autofunction:: to_hatches(paths: Iterable[Path], *, edge_path: True, distance: float = 0.01, segments: int = 4, g1_tol: float = 1e-4, extrusion: Vertex = (0, 0, 1),  dxfattribs: Dict = None) -> Iterable[Hatch]
 
+.. autofunction:: to_mpolygons(paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, extrusion: Vertex = (0, 0, 1),  dxfattribs: Dict = None) -> Iterable[MPolygon]
+
 .. autofunction:: to_polylines3d(paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, dxfattribs: Dict = None) -> Iterable[Polyline]
 
 .. autofunction:: to_lines(paths: Iterable[Path], *, distance: float = 0.01, segments: int = 4, dxfattribs: Dict = None) -> Iterable[Line]
@@ -152,7 +185,7 @@ Functions to create construction tools.
 
 .. autofunction:: to_matplotlib_path(paths: Iterable[Path], extrusion = (0, 0, 1)) -> matplotlib.path.Path
 
-.. autofunction:: to_qpainter_path(paths: Iterable[Path], extrusion = (0, 0, 1)) -> PyQt5.QtGui.QPainterPath
+.. autofunction:: to_qpainter_path(paths: Iterable[Path], extrusion = (0, 0, 1)) -> QPainterPath
 
 
 Utility Functions
@@ -173,6 +206,16 @@ Utility Functions
 .. autofunction:: add_ellipse(path: Path,ellipse: ConstructionEllipse, segments=1)
 
 .. autofunction:: add_spline(path: Path, spline: BSpline, level=4)
+
+.. autofunction:: to_multi_path(paths: Iterable[Path]) -> Path
+
+.. autofunction:: single_paths(paths: Iterable[Path]) -> Iterable[Path]
+
+.. autofunction:: have_close_control_vertices(a: Path, b: Path, *, rel_tol=1e-9, abs_tol=1e-12) -> bool
+
+.. autofunction:: lines_to_curve3(path: Path) -> Path
+
+.. autofunction:: lines_to_curve4(path: Path) -> Path
 
 Basic Shapes
 ------------
@@ -200,41 +243,55 @@ The Path Class
 
 .. class:: Path
 
-    .. autoattribute:: start
+    .. autoproperty:: end
 
-    .. autoattribute:: end
+    .. autoproperty:: has_curves
 
-    .. autoattribute:: is_closed
+    .. autoproperty:: has_lines
 
-    .. autoattribute:: has_lines
+    .. autoproperty:: has_sub_paths
 
-    .. autoattribute:: has_curves
+    .. autoproperty:: is_closed
 
-    .. automethod:: control_vertices
+    .. autoproperty:: start
 
-    .. automethod:: has_clockwise_orientation
+    .. autoproperty:: user_data
 
-    .. automethod:: line_to(location: Vec3)
+    .. automethod:: append_path(path: Path)
+
+    .. automethod:: approximate(segments: int=20) -> Iterator[Vec3]
+
+    .. automethod:: clockwise() -> Path
+
+    .. automethod:: clone() -> Path
+
+    .. automethod:: close
+
+    .. automethod:: close_sub_path
+
+    .. automethod:: control_vertices() -> List[Vec3]
+
+    .. automethod:: counter_clockwise() -> Path
 
     .. automethod:: curve3_to(location: Vec3, ctrl: Vec3)
 
     .. automethod:: curve4_to(location: Vec3, ctrl1: Vec3, ctrl2: Vec3)
 
-    .. automethod:: close
+    .. automethod:: extend_multi_path(path: Path)
 
-    .. automethod:: clone() -> Path
+    .. automethod:: flattening(distance: float, segments: int=16) -> Iterator[Vec3]
+
+    .. automethod:: has_clockwise_orientation
+
+    .. automethod:: line_to(location: Vec3)
+
+    .. automethod:: move_to(location: Vec3)
 
     .. automethod:: reversed() -> Path
 
-    .. automethod:: clockwise() -> Path
-
-    .. automethod:: counter_clockwise() -> Path
+    .. automethod:: sub_paths() -> Iterator[Path]
 
     .. automethod:: transform(m: Matrix44) -> Path
-
-    .. automethod:: approximate(segments: int=20) -> Iterable[Vec3]
-
-    .. automethod:: flattening(distance: float, segments: int=16) -> Iterable[Vec3]
 
 .. _PathPatch: https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.patches.PathPatch.html#matplotlib.patches.PathPatch
 .. _QPainterPath: https://doc.qt.io/qt-5/qpainterpath.html

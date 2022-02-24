@@ -1,11 +1,12 @@
 #  Copyright (c) 2021, Manfred Moitzi
 #  License: MIT License
-from typing import Sequence, Iterable, Optional, Tuple, List
+from typing import Sequence, Iterable, Optional, Tuple, List, NamedTuple
 import abc
-import math
 import itertools
 import enum
+
 from ezdxf.math import Matrix44, BoundingBox2d
+from ezdxf.tools.text import leading
 
 """
 
@@ -118,7 +119,7 @@ Do not support margins.
         
     2.2 Fraction cell ... (MTEXT!)
 
-3. HCellGroup (H for horizontal, a.k.a. Line)
+3. AbstractLine
     
     A line contains only simple boxes and has a fixed width. 
     The height is determined by the tallest box of the group. 
@@ -133,52 +134,10 @@ clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 """
 
 
-def lorem_ipsum(count=100):
-    return itertools.islice(itertools.cycle(LOREM_IPSUM.split()), count)
-
-
-class ContentRenderer(abc.ABC):
-    @abc.abstractmethod
-    def render(self, left: float, bottom: float, right: float,
-               top: float, m: Matrix44 = None) -> None:
-        """ Render content into the given borders (lower left and upper right
-        corners).
-
-        Args:
-            left: x coordinate of the left border
-            bottom: y coordinate of the bottom border
-            right: x coordinate of the right border
-            top: y coordinate of the top border
-            m: transformation Matrix44
-
-        """
-        pass
-
-    @abc.abstractmethod
-    def line(self, x1: float, y1: float, x2: float, y2: float,
-             m: Matrix44 = None) -> None:
-        """ Draw a line from (x1, y1) to (x2, y2). """
-        pass
-
-
-Tuple4f = Tuple[float, float, float, float]
-Tuple2f = Tuple[float, float]
-
-
-def resolve_margins(margins: Optional[Sequence[float]]) -> Tuple4f:
-    """ Returns the box margins in CSS like order: top, right, bottom, left.
-    """
-    if margins is None:
-        return 0, 0, 0, 0
-    count = len(margins)
-    if count == 4:  # CSS: top, right, bottom, left
-        return margins[0], margins[1], margins[2], margins[3]
-    elif count == 3:  # CSS: top, right, bottom, left=right
-        return margins[0], margins[1], margins[2], margins[1]
-    elif count == 2:  # CSS: top, right, bottom=top, left=right
-        return margins[0], margins[1], margins[0], margins[1]
-    elif count == 1:  # CSS: top, right=top, bottom=top, left=top
-        return margins[0], margins[0], margins[0], margins[0]
+class Stacking(enum.IntEnum):
+    OVER = 0
+    LINE = 1
+    SLANTED = 2
 
 
 class LayoutAlignment(enum.IntEnum):
@@ -193,14 +152,110 @@ class LayoutAlignment(enum.IntEnum):
     BOTTOM_RIGHT = 9
 
 
-def insert_location(align: LayoutAlignment,
-                    width: float, height: float) -> Tuple2f:
-    """ Returns the left top corner adjusted to the given alignment.
-    """
-    left = 0
-    top = 0
-    center = width / 2
-    middle = height / 2
+class CellAlignment(enum.IntEnum):
+    BOTTOM = 0
+    CENTER = 1
+    TOP = 2
+
+
+class ParagraphAlignment(enum.IntEnum):
+    LEFT = 1
+    RIGHT = 2
+    CENTER = 3
+    JUSTIFIED = 4
+
+
+class TabStopType(enum.IntEnum):
+    LEFT = 0
+    RIGHT = 1
+    CENTER = 2
+
+
+class TabStop(NamedTuple):
+    pos: float = 0.0
+    kind: TabStopType = TabStopType.LEFT
+
+
+def lorem_ipsum(count=100):
+    return itertools.islice(itertools.cycle(LOREM_IPSUM.split()), count)
+
+
+class ContentRenderer(abc.ABC):
+    @abc.abstractmethod
+    def render(
+        self,
+        left: float,
+        bottom: float,
+        right: float,
+        top: float,
+        m: Matrix44 = None,
+    ) -> None:
+        """Render content into the given borders (lower left and upper right
+        corners).
+
+        Args:
+            left: x coordinate of the left border
+            bottom: y coordinate of the bottom border
+            right: x coordinate of the right border
+            top: y coordinate of the top border
+            m: transformation Matrix44
+
+        """
+        pass
+
+    @abc.abstractmethod
+    def line(
+        self, x1: float, y1: float, x2: float, y2: float, m: Matrix44 = None
+    ) -> None:
+        """Draw a line from (x1, y1) to (x2, y2)."""
+        pass
+
+
+class DoNothingRenderer(ContentRenderer):
+    def render(
+        self,
+        left: float,
+        bottom: float,
+        right: float,
+        top: float,
+        m: Matrix44 = None,
+    ) -> None:
+        pass
+
+    def line(
+        self, x1: float, y1: float, x2: float, y2: float, m: Matrix44 = None
+    ) -> None:
+        pass
+
+
+Tuple4f = Tuple[float, float, float, float]
+Tuple2f = Tuple[float, float]
+
+
+def resolve_margins(margins: Optional[Sequence[float]]) -> Tuple4f:
+    """Returns the box margins in CSS like order: top, right, bottom, left."""
+    if margins is None:
+        return 0, 0, 0, 0
+    count = len(margins)
+    if count == 4:  # CSS: top, right, bottom, left
+        return margins[0], margins[1], margins[2], margins[3]
+    elif count == 3:  # CSS: top, right, bottom, left=right
+        return margins[0], margins[1], margins[2], margins[1]
+    elif count == 2:  # CSS: top, right, bottom=top, left=right
+        return margins[0], margins[1], margins[0], margins[1]
+    elif count == 1:  # CSS: top, right=top, bottom=top, left=top
+        return margins[0], margins[0], margins[0], margins[0]
+    return 0, 0, 0, 0
+
+
+def insert_location(
+    align: LayoutAlignment, width: float, height: float
+) -> Tuple2f:
+    """Returns the left top corner adjusted to the given alignment."""
+    left: float = 0.0
+    top: float = 0.0
+    center = width / 2.0
+    middle = height / 2.0
     if align == LayoutAlignment.TOP_LEFT:
         pass
     elif align == LayoutAlignment.TOP_CENTER:
@@ -223,7 +278,6 @@ def insert_location(align: LayoutAlignment,
 
 
 class Box(abc.ABC):
-
     @property
     @abc.abstractmethod
     def total_width(self) -> float:
@@ -236,21 +290,21 @@ class Box(abc.ABC):
 
     @abc.abstractmethod
     def place(self, x: float, y: float):
-        """ (x, y) is the top/left corner """
+        """(x, y) is the top/left corner"""
         pass
 
     @abc.abstractmethod
     def final_location(self) -> Tuple[float, float]:
-        """ Returns the final location as the top/left corner """
+        """Returns the final location as the top/left corner"""
         pass
 
     @abc.abstractmethod
     def render(self, m: Matrix44 = None) -> None:
-        """ Render content at the final location. """
+        """Render content at the final location."""
         pass
 
     def bbox(self) -> BoundingBox2d:
-        """ Returns the 2D bounding box of the container. If the cell is
+        """Returns the 2D bounding box of the container. If the cell is
         not placed the top/left corner = (0, 0).
 
         """
@@ -258,8 +312,9 @@ class Box(abc.ABC):
             x, y = self.final_location()
         except (ValueError, TypeError):
             x, y = 0, 0
-        return BoundingBox2d([
-            (x, y), (x + self.total_width, y - self.total_height)])
+        return BoundingBox2d(
+            [(x, y), (x + self.total_width, y - self.total_height)]
+        )
 
 
 class Cell(Box):  # ABC
@@ -280,10 +335,11 @@ class Cell(Box):  # ABC
 
 
 class Glue(Cell):  # ABC
-    EMPTY = tuple()
+    EMPTY: Tuple = tuple()
 
-    def __init__(self, width: float, min_width: float = None,
-                 max_width: float = None):
+    def __init__(
+        self, width: float, min_width: float = None, max_width: float = None
+    ):
         self._width: float = float(width)
         self._min_width = float(min_width) if min_width else self._width
         self._max_width: Optional[float] = max_width
@@ -310,7 +366,7 @@ class Glue(Cell):  # ABC
     def total_height(self) -> float:
         return 0
 
-    def to_space(self) -> 'Space':
+    def to_space(self) -> "Space":
         return Space(self._width, self._min_width, self._max_width)
 
 
@@ -322,14 +378,12 @@ class NonBreakingSpace(Glue):
     pass
 
 
-class CellAlignment(enum.IntEnum):
-    BOTTOM = 0
-    CENTER = 1
-    TOP = 2
+class Tabulator(Glue):
+    pass
 
 
 class ContentCell(Cell):  # ABC
-    """ Represents visible content like text or fractions.
+    """Represents visible content like text or fractions.
 
     Supported vertical alignments (IntEnum):
 
@@ -342,14 +396,18 @@ class ContentCell(Cell):  # ABC
         === =================
 
     """
+
     is_visible = True
 
-    def __init__(self, width: float,
-                 height: float,
-                 valign: CellAlignment = CellAlignment.BOTTOM,
-                 renderer: ContentRenderer = None):
-        self._final_x = None
-        self._final_y = None
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        valign: CellAlignment = CellAlignment.BOTTOM,
+        renderer: ContentRenderer = None,
+    ):
+        self._final_x: Optional[float] = None
+        self._final_y: Optional[float] = None
         self._width = float(width)
         self._height = float(height)
         self.valign = CellAlignment(valign)  # public attribute read/write
@@ -371,7 +429,7 @@ class ContentCell(Cell):  # ABC
         return self._height
 
     def place(self, x: float, y: float):
-        """ (x, y) is the top/left corner """
+        """(x, y) is the top/left corner"""
         self._final_x = x
         self._final_y = y
 
@@ -386,7 +444,7 @@ class Stroke:
 
 
 class Text(ContentCell):
-    """ Represents visible text content.
+    """Represents visible text content.
 
     Supported strokes as bit values (flags), can be combined:
 
@@ -405,11 +463,14 @@ class Text(ContentCell):
 
     """
 
-    def __init__(self, width: float,
-                 height: float,
-                 valign: CellAlignment = CellAlignment.BOTTOM,
-                 stroke: int = Stroke.NO_STROKE,
-                 renderer: ContentRenderer = None):
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        valign: CellAlignment = CellAlignment.BOTTOM,
+        stroke: int = Stroke.NO_STROKE,
+        renderer: ContentRenderer = None,
+    ):
         super().__init__(width, height, valign, renderer)
         self.stroke = int(stroke)  # public attribute read/write
 
@@ -418,23 +479,23 @@ class Text(ContentCell):
         height = self.total_height
         bottom = top - height
         right = left + self.total_width
-        renderer = self.renderer
+        self.renderer.render(  # type: ignore
+            left=left, bottom=bottom, right=right, top=top, m=m
+        )
 
-        # render content
-        renderer.render(
-            left=left, bottom=bottom,
-            right=right, top=top, m=m)
-
-    def render_stroke(self,
-                      extend_left: float = 0,
-                      extend_right: float = 0,
-                      m: Matrix44 = None) -> None:
+    def render_stroke(
+        self,
+        extend_left: float = 0,
+        extend_right: float = 0,
+        m: Matrix44 = None,
+    ) -> None:
         left, top = self.final_location()
         left -= extend_left
         height = self.total_height
         bottom = top - height
         right = left + self.total_width + extend_right
         renderer = self.renderer
+        assert renderer is not None
 
         # render underline, strike through, overline
         spacing = height / 5  # ???
@@ -449,8 +510,14 @@ class Text(ContentCell):
             renderer.line(left, y, right, y, m)
 
 
+def render_cells(cells: Iterable[Cell], m: Matrix44 = None) -> None:
+    for cell in cells:
+        if cell.is_visible:
+            cell.render(m)
+
+
 def render_text_strokes(cells: List[Cell], m: Matrix44 = None) -> None:
-    """ Render text cell strokes across glue cells. """
+    """Render text cell strokes across glue cells."""
 
     # Should be called for container with horizontal arranged text cells
     # like HCellGroup to create underline, overline and strike trough
@@ -476,14 +543,8 @@ def render_text_strokes(cells: List[Cell], m: Matrix44 = None) -> None:
             cell.render_stroke(extend_right=extend, m=m)
 
 
-class Stacking(enum.IntEnum):
-    OVER = 0
-    LINE = 1
-    SLANTED = 2
-
-
 class Fraction(ContentCell):
-    """ Represents visible fractions.
+    """Represents visible fractions.
 
     Supported stacking A/B (IntEnum):
 
@@ -496,13 +557,17 @@ class Fraction(ContentCell):
         === =========== =========
 
     """
+
     HEIGHT_SCALE = 1.2
 
-    def __init__(self, top: ContentCell,
-                 bottom: ContentCell,
-                 stacking: Stacking = Stacking.OVER,
-                 valign: CellAlignment = CellAlignment.BOTTOM,
-                 renderer: ContentRenderer = None):
+    def __init__(
+        self,
+        top: ContentCell,
+        bottom: ContentCell,
+        stacking: Stacking = Stacking.OVER,
+        valign: CellAlignment = CellAlignment.BOTTOM,
+        renderer: ContentRenderer = None,
+    ):
         super().__init__(0, 0, valign, renderer)
         self._stacking = stacking
         self._top_content = top
@@ -517,11 +582,12 @@ class Fraction(ContentCell):
             self._width = top.total_width + bottom.total_width
         else:
             self._height = self.HEIGHT_SCALE * (
-                    top.total_height + bottom.total_height)
+                top.total_height + bottom.total_height
+            )
             self._width = max(top.total_width, bottom.total_width)
 
     def place(self, x: float, y: float):
-        """ (x, y) is the top/left corner """
+        """(x, y) is the top/left corner"""
         self._final_x = x
         self._final_y = y
         width = self.total_width
@@ -529,19 +595,19 @@ class Fraction(ContentCell):
         top_content = self._top_content
         bottom_content = self._bottom_content
         if top_content is None or bottom_content is None:
-            raise ValueError('no content set')
+            raise ValueError("no content set")
 
         if self._stacking == Stacking.SLANTED:
             top_content.place(x, y)  # left/top
             x += width - bottom_content.total_width
-            y -= (height - bottom_content.total_height)
+            y -= height - bottom_content.total_height
             bottom_content.place(x, y)  # right/bottom
         else:
             center = x + width / 2
             x = center - top_content.total_width / 2
             top_content.place(x, y)  # center/top
             x = center - bottom_content.total_width / 2
-            y -= (height - bottom_content.total_height)
+            y -= height - bottom_content.total_height
             bottom_content.place(x, y)  # center/bottom
 
     def render(self, m: Matrix44 = None) -> None:
@@ -566,12 +632,12 @@ class Fraction(ContentCell):
             y1 = cy - delta
             x2 = cx + delta
             y2 = cy + delta
-        self.renderer.line(x1, y1, x2, y2, m)
+        self.renderer.line(x1, y1, x2, y2, m)  # type: ignore
 
 
-_content = {Text, Fraction}
-_glue = {Space, NonBreakingSpace}
-_no_break = {Text, Fraction, NonBreakingSpace}
+_content = (Text, Fraction)
+_glue = (Space, NonBreakingSpace, Tabulator)
+_no_break = (Text, NonBreakingSpace)
 
 
 def normalize_cells(cells: Iterable[Cell]) -> List[Cell]:
@@ -579,7 +645,7 @@ def normalize_cells(cells: Iterable[Cell]) -> List[Cell]:
         index = len(content) - 1
         while index >= 0:
             cell = content[index]
-            if type(cell) is NonBreakingSpace:
+            if isinstance(cell, NonBreakingSpace):
                 content[index] = cell.to_space()
                 index -= 1
             else:
@@ -587,10 +653,10 @@ def normalize_cells(cells: Iterable[Cell]) -> List[Cell]:
 
     def is_useless_nbsp():
         try:
-            peek = type(cells[index + 1])
+            peek = cells[index + 1]
         except IndexError:
             return True
-        if prev not in _no_break or peek not in _no_break:
+        if not isinstance(prev, _no_break) or not isinstance(peek, _no_break):
             return True
         return False
 
@@ -598,136 +664,46 @@ def normalize_cells(cells: Iterable[Cell]) -> List[Cell]:
     cells = list(cells)
     prev = None
     for index, cell in enumerate(cells):
-        current = type(cell)
-        if current in _content:
-            if prev in _content:
-                raise ValueError('no glue between content cells')
-        elif current is NonBreakingSpace and is_useless_nbsp():
+
+        if isinstance(cell, _content):
+            if isinstance(prev, _content):
+                raise ValueError("no glue between content cells")
+        elif isinstance(cell, NonBreakingSpace) and is_useless_nbsp():
             cell = cell.to_space()
-            current = type(cell)
             replace_pending_nbsp_by_spaces()
 
-        prev = current
+        prev = cell
         content.append(cell)
 
     # remove pending glue:
-    while content and (type(content[-1]) in _glue):
+    while content and isinstance(content[-1], _glue):
         content.pop()
 
     return content
 
 
-class HCellGroup(ContentCell):
-    """ Stores content in horizontal order and does not render itself.
-    Recursive data structure, a HCellGroup can contain cell groups as well.
-
-    This is not a real container class, from outside it behaves like a
-    single opaque cell with a fixed width and height determined by the
-    extents of its content.
-
-    """
-
-    def __init__(self, cells: Iterable[Cell] = None,
-                 valign=CellAlignment.BOTTOM):
-        super().__init__(0, 0, valign=valign)
-        self._cells: List[Cell] = []
-        if cells:
-            self.extend(cells)
-
-    def __iter__(self):
-        return iter(self._cells)
-
-    def place(self, x: float, y: float):
-        super().place(x, y)
-        group_height = self.total_height
-        cx = x
-        for cell in self._cells:
-            cy = y
-            if isinstance(cell, ContentCell) and \
-                    cell.valign != CellAlignment.TOP:
-                dy = cell.total_height - group_height
-                if cell.valign == CellAlignment.CENTER:
-                    dy /= 2.0
-                cy += dy
-
-            cell.place(cx, cy)
-            cx += cell.total_width
-
-    def append(self, cell: Cell):
-        self._height = max(cell.total_height, self._height)
-        self._width += cell.total_width
-        self._cells.append(cell)
-
-    def extend(self, cells: Iterable[Cell]):
-        for cell in cells:
-            self.append(cell)
-
-    def render(self, m: Matrix44 = None) -> None:
-        for cell in self._cells:
-            if cell.is_visible:
-                cell.render(m)
-
-        # HCellGroup can contain Text cells:
-        render_text_strokes(self._cells, m)
-
-    def grow(self, target_width: float) -> None:
-        """ Expand glue cells to match target_width by `total_width`. """
-        self._apply_justified_alignment(target_width)
-        self.update_width()
-
-    def update_width(self):
-        self._width = sum(cell.total_width for cell in self._cells)
-
-    def _glue_cells(self):
-        return [cell for cell in self._cells if isinstance(cell, Glue)]
-
-    def _apply_justified_alignment(self, target_width: float) -> None:
-        success = False
-        spaces: List[Glue] = self._glue_cells()
-        if len(spaces) == 0:  # no spaces to grow
-            return
-
-        while not success:
-            success = True
-            # total line width could be bigger than width!
-            space_to_distribute = target_width - self.total_width
-            if space_to_distribute < 1e-6:
-                return
-
-            growable_spaces = [space for space in spaces if space.can_grow]
-            count = len(growable_spaces)
-            if count == 0:  # no spaces to grow
-                return
-
-            delta_space = space_to_distribute / count
-            for space in growable_spaces:
-                new_size = space.total_width + delta_space
-                space.resize(new_size)
-                if not math.isclose(new_size, space.total_width):
-                    # space can't grow that much
-                    success = False
-                    # but grow remaining spaces
-
-
 class Container(Box):
-    def __init__(self, width: float,
-                 height: float = None,
-                 margins: Sequence[float] = None,
-                 renderer: ContentRenderer = None):
-        self._final_x = None
-        self._final_y = None
+    def __init__(
+        self,
+        width: Optional[float],
+        height: float = None,
+        margins: Sequence[float] = None,
+        renderer: ContentRenderer = None,
+    ):
+        self._final_x: Optional[float] = None
+        self._final_y: Optional[float] = None
 
         # _content_width is None for: defined by content
-        self._content_width = width
+        self._content_width: Optional[float] = width
 
         # _content_height is None for: defined by content
-        self._content_height = height
+        self._content_height: Optional[float] = height
 
         # margins are always defined
-        self._margins = resolve_margins(margins)
+        self._margins: Tuple4f = resolve_margins(margins)
 
         # content renderer is optional:
-        self.renderer: Optional = renderer
+        self.renderer: Optional[ContentRenderer] = renderer
 
     def place(self, x: float, y: float):
         self._final_x = x
@@ -736,7 +712,7 @@ class Container(Box):
 
     def final_location(self):
         if not self.is_placed():
-            raise ValueError('Container is not placed.')
+            raise ValueError("Container is not placed.")
         return self._final_x, self._final_y
 
     def is_placed(self) -> bool:
@@ -789,90 +765,81 @@ class Container(Box):
         return self.content_height + self.top_margin + self.bottom_margin
 
     def render(self, m: Matrix44 = None) -> None:
-        """ Render container content.
+        """Render container content.
 
         (x, y) is the top/left corner
         """
         if not self.is_placed():
-            raise ValueError('Layout has to be placed before rendering')
+            raise ValueError("Layout has to be placed before rendering")
         if self.renderer:
             self.render_background(m)
         self.render_content(m)
 
     @abc.abstractmethod
     def place_content(self):
-        """ Place container content at the final location. """
+        """Place container content at the final location."""
         pass
 
     def render_content(self, m: Matrix44 = None) -> None:
-        """ Render content at the final location. """
-        for entity in self:
+        """Render content at the final location."""
+        for entity in self:  # type: ignore
             entity.render(m)
 
     def render_background(self, m: Matrix44) -> None:
-        """ Render background at the final location. """
+        """Render background at the final location."""
         # Render content background inclusive margins!
         # (x, y) is the top/left corner
         x, y = self.final_location()
         if self.renderer:
             self.renderer.render(
-                left=x, bottom=y - self.total_height,
-                top=y, right=x + self.total_width, m=m)
+                left=x,
+                bottom=y - self.total_height,
+                top=y,
+                right=x + self.total_width,
+                m=m,
+            )
 
 
-class Paragraph(Container):  # ABC
-    @abc.abstractmethod
+class EmptyParagraph(Cell):
+    """Spacer between two paragraphs, represents empty lines like in
+    "line1\n\nline2".
+    """
+
+    def __init__(self, cap_height: float, line_spacing: float = 1):
+        self._height: float = cap_height
+        self._width: float = 0
+        self._last_line_spacing = leading(cap_height, line_spacing) - cap_height
+
+    @property
+    def total_width(self) -> float:
+        return self._width
+
+    @property
+    def total_height(self) -> float:
+        return self._height
+
+    def set_total_width(self, width: float):
+        self._width = width
+
     def distribute_content(self, height: float = None):
         pass
 
-    @abc.abstractmethod
-    def set_total_width(self, width: float):
-        pass
+    @property
+    def distance_to_next_paragraph(self) -> float:
+        return self._last_line_spacing
 
 
-class FlowTextAlignment(enum.IntEnum):
-    DEFAULT = 0
-    LEFT = 1
-    RIGHT = 2
-    CENTER = 3
-    JUSTIFIED = 4
-
-
-class FlowText(Paragraph):
-    """ Single paragraph of flow text.
-
-    Supported paragraph alignments (IntEnum):
-
-        === =================
-        int FlowTextAlignment
-        === =================
-        0   DEFAULT
-        1   LEFT
-        2   RIGHT
-        3   CENTER
-        4   JUSTIFIED
-        === =================
-
-    Paragraph indentation is supported by three values given as argument
-    `indent`. The first value defines the left indentation of the first line,
-    the following two values define the common line indentation for the left
-    and right side. The indentation value is a positive value, measured from
-    the border towards the inside of the paragraph.
-    Negative values can be used, but are not tested nor officially supported.
-
-    Line spacing is 3-on-5 and is based on the cap height, e.g. for a
-    cap height of 1.0 the leading (distance from base line to base line)
-    is 1.667. The `line_spacing` argument is an additional stretching factor.
-
-    """
-    _LEFT_AND_JUSTIFIED = (FlowTextAlignment.LEFT, FlowTextAlignment.JUSTIFIED)
-
-    def __init__(self, width: float = None,  # defined by parent container
-                 align: FlowTextAlignment = FlowTextAlignment.DEFAULT,
-                 indent: Tuple[float, float, float] = (0, 0, 0),
-                 line_spacing: float = 1,
-                 margins: Sequence[float] = None,
-                 renderer: ContentRenderer = None):
+class Paragraph(Container):
+    def __init__(
+        self,
+        width: float = None,  # defined by parent container
+        align: ParagraphAlignment = ParagraphAlignment.LEFT,
+        indent: Tuple[float, float, float] = (0, 0, 0),
+        line_spacing: float = 1,
+        margins: Sequence[float] = None,
+        tab_stops: Sequence[TabStop] = None,
+        renderer: ContentRenderer = None,
+    ):
         super().__init__(width, None, margins, renderer)
         self._align = align
         first, left, right = indent
@@ -880,76 +847,76 @@ class FlowText(Paragraph):
         self._indent_left = left
         self._indent_right = right
         self._line_spacing = line_spacing
+        self._tab_stops = tab_stops or []
 
         # contains the raw and not distributed content:
         self._cells: List[Cell] = []
 
         # contains the final distributed content:
-        self._lines: List[HCellGroup] = []
+        self._lines: List[AbstractLine] = []
 
-        # This flag is False if the original flow text was split into
-        # multiple paragraphs and this is not the last one.
-        self._has_last_line = True
+        # space to next paragraph
+        self._last_line_spacing = 0.0
 
     def __iter__(self):
         return iter(self._lines)
 
+    @property
+    def distance_to_next_paragraph(self):
+        return self._last_line_spacing
+
     def set_total_width(self, width: float):
         self._content_width = width - self.left_margin - self.right_margin
         if self._content_width < 1e-6:
-            raise ValueError('invalid width, no usable space left')
+            raise ValueError("invalid width, no usable space left")
+
+    def append_content(self, content: Iterable[Cell]):
+        self._cells.extend(content)
+
+    def line_width(self, first: bool) -> float:
+        indent = self._indent_right
+        indent += self._indent_first if first else self._indent_left
+        return self.content_width - indent
 
     def place_content(self):
         x, y = self.final_location()
         x += self.left_margin
         y -= self.top_margin
-        justified_alignment = self._align == FlowTextAlignment.JUSTIFIED
         first = True
-        available_width = self.line_width(first)
         lines = self._lines
-        last_line = lines[-1] if lines else None
         for line in lines:
-            if justified_alignment:
-                if line is not last_line or not self._has_last_line:
-                    line.grow(available_width)
-            x_final = self._left_border(x, line, first, available_width)
+            x_final = self._left_border(x, first)
             line.place(x_final, y)
             y -= leading(line.total_height, self._line_spacing)
-            if first:
-                first = False
-                available_width = self.line_width(first)
+            first = False
 
-    def _left_border(self, x: float, line: HCellGroup, first: bool,
-                     available_width: float) -> float:
-        """ Apply indentation and paragraph alignment """
-        alignment = self._align
-        if alignment == FlowTextAlignment.DEFAULT:
-            alignment = FlowTextAlignment.LEFT
-
+    def _left_border(self, x: float, first: bool) -> float:
+        """Apply indentation and paragraph alignment"""
         left_indent = self._indent_first if first else self._indent_left
-        left_border = x + left_indent
-        if alignment in FlowText._LEFT_AND_JUSTIFIED:
-            return left_border
-
-        right_border = left_border + available_width
-        if alignment == FlowTextAlignment.RIGHT:
-            return right_border - line.total_width
-        elif alignment == FlowTextAlignment.CENTER:
-            center = (right_border + left_border) / 2
-            return center - line.total_width / 2
-        return left_border
+        return x + left_indent
 
     def _calculate_content_height(self) -> float:
-        """ Returns the actual content height determined by the distributed
+        """Returns the actual content height determined by the distributed
         lines.
         """
-        return sum(
-            leading(line.total_height, self._line_spacing)
-            for line in self._lines
-        )
+        lines = self._lines
+        line_spacing = self._line_spacing
+        height = 0.0
+        if len(lines):
+            last_line = lines[-1]
+            height = sum(
+                leading(line.total_height, line_spacing) for line in lines[:-1]
+            )
+            # do not add line spacing after last line!
+            last_line_height = last_line.total_height
+            self._last_line_spacing = (
+                leading(last_line_height, line_spacing) - last_line_height
+            )
+            height += last_line_height
+        return height
 
-    def distribute_content(self, height: float = None) -> Optional['FlowText']:
-        """ Distribute the raw content into lines. Returns the cells which do
+    def distribute_content(self, height: float = None) -> Optional["Paragraph"]:
+        """Distribute the raw content into lines. Returns the cells which do
         not fit as a new paragraph.
 
         Args:
@@ -958,172 +925,148 @@ class FlowText(Paragraph):
 
         """
 
-        # This method does not apply indentation or alignment,
-        # see place_content() method.
+        def new_line(width: float) -> AbstractLine:
+            if align in (ParagraphAlignment.LEFT, ParagraphAlignment.JUSTIFIED):
+                indent = self._indent_first if first else self._indent_left
+                tab_stops = shift_tab_stops(self._tab_stops, -indent, width)
+                return (
+                    LeftLine(width, tab_stops)
+                    if align == ParagraphAlignment.LEFT
+                    else JustifiedLine(width, tab_stops)
+                )
+            elif align == ParagraphAlignment.RIGHT:
+                return RightLine(width)
+            elif align == ParagraphAlignment.CENTER:
+                return CenterLine(width)
+            else:
+                raise ValueError(align)
 
-        def remove_line_breaking_space(cells: List[Cell]):
-            """ Remove last space """
-            if cells and isinstance(cells[-1], Space):
-                cells.pop()
-
-        def next_group(cells):
-            """ Returns the next group:
-
-                - single content Text or Fraction
-                - single Space
-                - content connected by nbsp
-
-            """
-            group = []
-            if cells:
-                next_t = type(cells[-1])
-                if next_t is NonBreakingSpace:
-                    group.append(cells.pop())
-                    group.extend(next_group(cells))
-                elif next_t in _content:
-                    group.append(cells.pop())
-                    if cells and isinstance(cells[-1], NonBreakingSpace):
-                        group.extend(next_group(cells))
-                else:
-                    group.append(cells.pop())
-            return group
-
-        def group_width(group: Iterable[Cell]):
-            return sum(c.total_width for c in group)
-
-        def append_line(cells_):
-            nonlocal first
-            first = False
-            self._lines.append(cells_)
-
-        # Refactoring required:
-        # using indices into `cells` instead creating temp copies.
-
-        cells = normalize_cells(self._cells)
-        cells.reverse()
-        undo = cells
-        first = True
-        paragraph_height = self.top_margin + self.bottom_margin
-        while cells:
-            if height is not None:  # is restricted
-                # shallow copy current cell state for undo, if not enough space
-                # for next line:
-                undo = list(cells)
-            available_space = self.line_width(first)
-            line = []
-            while cells and available_space:
-                tmp_cells = list(cells)
-                group = next_group(tmp_cells)
-                width = group_width(group)
-                if width <= available_space:
-                    # add group to current line
-                    cells = tmp_cells
-                    line.extend(group)
-                    available_space -= width
-                else:  # not enough space for current group
-                    # first group in current line?
-                    if not line:
-                        # add group as a line, which extends beyond borders!
-                        cells = tmp_cells
-                        line = group
-                    available_space = 0
-
-                if abs(available_space) < 1e-6:
-                    remove_line_breaking_space(line)
-                    remove_line_breaking_space(cells)
-
-            if line:
-                line_cells = HCellGroup(line)
-                if height is None:  # unrestricted height
-                    append_line(line_cells)
-                else:  # height is restricted
-                    # The line height is only defined if the content
-                    # of the line is known:
-                    line_height = line_cells.total_height
-                    if paragraph_height + line_height > height:
-                        # Not enough space for the new line:
-                        cells = undo
-                        break
-                    else:
-                        append_line(line_cells)
-                        paragraph_height += leading(
-                            line_height, self._line_spacing)
-
+        cells: List[Cell] = normalize_cells(self._cells)
+        cells = group_non_breakable_cells(cells)
         # Delete raw content:
-        self._cells = []
+        self._cells.clear()
+
+        align: ParagraphAlignment = self._align
+        index: int = 0  # index of current cell
+        count: int = len(cells)
+        first: bool = True  # is current line the first line?
+
+        # current paragraph height:
+        paragraph_height: float = self.top_margin + self.bottom_margin
+
+        # localize enums for core loop optimization:
+        # CPython 3.9 access is around 3x faster, no difference for PyPy 3.7!
+        FAIL, SUCCESS, FORCED = iter(AppendType)
+        while index < count:
+            # store index of first unprocessed cell to restore index,
+            # if not enough space in line
+            undo = index
+            line = new_line(self.line_width(first))
+            has_tab_support = line.has_tab_support
+            while index < count:
+                # core loop of paragraph processing and the whole layout engine:
+                cell = cells[index]
+                if isinstance(cell, Tabulator) and has_tab_support:
+                    append_state = line.append_with_tab(
+                        # a tabulator cell has always a following cell,
+                        # see normalize_cells()!
+                        cells[index + 1],
+                        cell,
+                    )
+                    if append_state == SUCCESS:
+                        index += 1  # consume tabulator
+                else:
+                    append_state = line.append(cell)
+                # state check order by probability:
+                if append_state == SUCCESS:
+                    index += 1  # consume current cell
+                elif append_state == FAIL:
+                    break
+                elif append_state == FORCED:
+                    index += 1  # consume current cell
+                    break
+
+            if line.has_content:
+                line.remove_line_breaking_space()
+                # remove line breaking space:
+                if index < count and isinstance(cells[index], Space):
+                    index += 1
+
+                line_height = line.total_height
+                if (
+                    height is not None  # restricted paragraph height
+                    and paragraph_height + line_height > height
+                ):
+                    # Not enough space for the new line:
+                    index = undo
+                    break
+                else:
+                    first = False
+                    self._lines.append(line)
+                    paragraph_height += leading(line_height, self._line_spacing)
+
+        not_all_cells_processed = index < count
+        if align == ParagraphAlignment.JUSTIFIED:
+            # distribute justified text across the line width,
+            # except for the VERY last line:
+            end = len(self._lines) if not_all_cells_processed else -1
+            for line in self._lines[:end]:
+                assert isinstance(line, JustifiedLine)
+                line.distribute()
 
         # Update content height:
         self._content_height = self._calculate_content_height()
 
         # If not all cells could be processed, put them into a new paragraph
         # and return it to the caller.
-        if cells:
-            cells.reverse()
-            self._has_last_line = False
-            return self._create_new_flow_text(cells, first)
+        if not_all_cells_processed:
+            return self._new_paragraph(cells[index:], first)
         else:
             return None
 
-    def _create_new_flow_text(self, cells: List[Cell],
-                              first: bool) -> 'FlowText':
+    def _new_paragraph(self, cells: List[Cell], first: bool) -> "Paragraph":
         # First line of the paragraph included?
         indent_first = self._indent_first if first else self._indent_left
         indent = (indent_first, self._indent_left, self._indent_right)
-        flow_text = FlowText(
+        paragraph = Paragraph(
             self._content_width,
             self._align,
             indent,
             self._line_spacing,
             self._margins,
-            self.renderer
+            self._tab_stops,
+            self.renderer,
         )
-        flow_text.append_content(cells)
-        return flow_text
-
-    def line_width(self, first: bool) -> float:
-        indent = self._indent_right
-        indent += self._indent_first if first else self._indent_left
-        return self.content_width - indent
-
-    def append_content(self, content: Iterable[Cell]):
-        self._cells.extend(content)
-
-
-def leading(cap_height: float, line_spacing: float = 1.0) -> float:
-    """ Returns the distance from baseline to baseline.
-
-    Args:
-        cap_height: cap height of the line
-        line_spacing: line spacing factor as percentage of 3-on-5 spacing
-
-    """
-    # 3-on-5 line spacing = 5/3 = 1.667
-    return cap_height * 1.667 * line_spacing
-
-
-class BulletList(Paragraph):
-    pass
+        paragraph.append_content(cells)
+        return paragraph
 
 
 class Column(Container):
-    def __init__(self, width: float,
-                 height: float = None,
-                 gutter: float = 0,
-                 margins: Sequence[float] = None,
-                 renderer: ContentRenderer = None):
+    def __init__(
+        self,
+        width: float,
+        height: float = None,
+        gutter: float = 0,
+        margins: Sequence[float] = None,
+        renderer: ContentRenderer = None,
+    ):
         super().__init__(width, height, margins, renderer)
         # spacing between columns
         self._gutter = gutter
         self._paragraphs: List[Paragraph] = []
 
-    def clone_empty(self) -> 'Column':
+    def clone_empty(self) -> "Column":
         return self.__class__(
             width=self.content_width,
             height=self.content_height,
             gutter=self.gutter,
-            margins=(self.top_margin, self.right_margin,
-                     self.bottom_margin, self.left_margin),
-            renderer=self.renderer
+            margins=(
+                self.top_margin,
+                self.right_margin,
+                self.bottom_margin,
+                self.left_margin,
+            ),
+            renderer=self.renderer,
         )
 
     def __iter__(self):
@@ -1134,7 +1077,7 @@ class Column(Container):
 
     @property
     def content_height(self) -> float:
-        """ Returns the current content height for flexible columns and the
+        """Returns the current content height for flexible columns and the
         max. content height otherwise.
         """
         max_height = self.max_content_height
@@ -1144,7 +1087,15 @@ class Column(Container):
             return max_height
 
     def used_content_height(self) -> float:
-        return sum(p.total_height for p in self._paragraphs)
+        paragraphs = self._paragraphs
+        height = 0.0
+        if paragraphs:
+            height = sum(
+                p.total_height + p.distance_to_next_paragraph
+                for p in paragraphs[:-1]
+            )
+            height += paragraphs[-1].total_height
+        return height
 
     @property
     def gutter(self):
@@ -1166,11 +1117,12 @@ class Column(Container):
         y -= self.top_margin
         for p in self._paragraphs:
             p.place(x, y)
-            y -= p.total_height
+            y -= p.total_height + p.distance_to_next_paragraph
 
     def append_paragraphs(
-            self, paragraphs: Iterable[Paragraph]) -> List[Paragraph]:
-        remainer = []
+        self, paragraphs: Iterable[Paragraph]
+    ) -> List[Paragraph]:
+        remainer: List[Paragraph] = []
         for paragraph in paragraphs:
             if remainer:
                 remainer.append(paragraph)
@@ -1179,7 +1131,7 @@ class Column(Container):
             if self.has_flex_height:
                 height = None
             else:
-                height = self.max_content_height - self.used_content_height()
+                height = self.max_content_height - self.used_content_height()  # type: ignore
             rest = paragraph.distribute_content(height)
             self._paragraphs.append(paragraph)
             if rest is not None:
@@ -1188,10 +1140,13 @@ class Column(Container):
 
 
 class Layout(Container):
-    def __init__(self, width: float,
-                 height: float = None,
-                 margins: Sequence[float] = None,
-                 renderer: ContentRenderer = None):
+    def __init__(
+        self,
+        width: float,
+        height: float = None,
+        margins: Sequence[float] = None,
+        renderer: ContentRenderer = None,
+    ):
         super().__init__(width, height, margins, renderer)
         self._reference_column_width = width
         self._current_column = 0
@@ -1202,6 +1157,10 @@ class Layout(Container):
 
     def __len__(self):
         return len(self._columns)
+
+    @property
+    def current_column_index(self):
+        return self._current_column
 
     @property
     def content_width(self):
@@ -1228,9 +1187,13 @@ class Layout(Container):
     def _calculate_content_height(self) -> float:
         return max(c.total_height for c in self._columns)
 
-    def place(self, x: float = 0, y: float = 0,
-              align: LayoutAlignment = LayoutAlignment.TOP_LEFT):
-        """ Place layout and all sub-entities at the final location, relative
+    def place(
+        self,
+        x: float = 0,
+        y: float = 0,
+        align: LayoutAlignment = LayoutAlignment.TOP_LEFT,
+    ):
+        """Place layout and all sub-entities at the final location, relative
         to the insertion point (x, y) by the alignment defined by the argument
         `align` (IntEnum).
 
@@ -1263,7 +1226,7 @@ class Layout(Container):
         super().place(x + left, y + top)
 
     def place_content(self):
-        """ Place content at the final location. """
+        """Place content at the final location."""
         x, y = self.final_location()
         x = x + self.left_margin
         y = y - self.top_margin
@@ -1271,15 +1234,20 @@ class Layout(Container):
             column.place(x, y)
             x += column.total_width + column.gutter
 
-    def append_column(self, width: float = None, height: float = None,
-                      gutter: float = 0,
-                      margins: Sequence[float] = None,
-                      renderer: ContentRenderer = None) -> Column:
-        """ Append a new column to the layout. """
+    def append_column(
+        self,
+        width: float = None,
+        height: float = None,
+        gutter: float = 0,
+        margins: Sequence[float] = None,
+        renderer: ContentRenderer = None,
+    ) -> Column:
+        """Append a new column to the layout."""
         if not width:
             width = self._reference_column_width
-        column = Column(width, height, gutter=gutter, margins=margins,
-                        renderer=renderer)
+        column = Column(
+            width, height, gutter=gutter, margins=margins, renderer=renderer
+        )
         self._columns.append(column)
         return column
 
@@ -1308,3 +1276,397 @@ class Layout(Container):
         empty = self._columns[-1].clone_empty()
         self._columns.append(empty)
         return empty
+
+    def next_column(self) -> None:
+        self._current_column += 1
+        if self._current_column >= len(self._columns):
+            self._new_column()
+
+
+def linear_placing(cells: Sequence[Cell], x: float, y: float):
+    for cell in cells:
+        cell.place(x, y)
+        x += cell.total_width
+
+
+class RigidConnection(ContentCell):
+    def __init__(
+        self, cells: Iterable[Cell] = None, valign=CellAlignment.BOTTOM
+    ):
+        super().__init__(0, 0, valign=valign)
+        self._cells: List[Cell] = list(cells) if cells else []
+
+    def __iter__(self):
+        return iter(self._cells)
+
+    @property
+    def total_width(self) -> float:
+        return sum(cell.total_width for cell in self._cells)
+
+    @property
+    def total_height(self) -> float:
+        return max(cell.total_height for cell in self._cells)
+
+    def render(self, m: Matrix44 = None) -> None:
+        render_cells(self._cells, m)
+        render_text_strokes(self._cells, m)
+
+    def place(self, x: float, y: float):
+        super().place(x, y)
+        linear_placing(self._cells, x, y)
+
+    def growable_glue(self) -> Iterable[Glue]:
+        return (
+            cell
+            for cell in self._cells
+            if isinstance(cell, Glue) and cell.can_grow
+        )
+
+
+def group_non_breakable_cells(cells: List[Cell]) -> List[Cell]:
+    def append_rigid_content(s: int, e: int):
+        _rigid_content = cells[s:e]
+        if len(_rigid_content) > 1:
+            new_cells.append(RigidConnection(_rigid_content))
+        else:
+            new_cells.append(_rigid_content[0])
+
+    index = 0
+    count = len(cells)
+    new_cells = []
+    while index < count:
+        cell = cells[index]
+        if isinstance(cell, _no_break):
+            start = index
+            index += 1
+            while index < count:
+                if not isinstance(cells[index], _no_break):
+                    append_rigid_content(start, index)
+                    break
+                index += 1
+            if index == count:
+                append_rigid_content(start, index)
+            else:
+                continue
+        else:
+            new_cells.append(cell)
+        index += 1
+    return new_cells
+
+
+def vertical_cell_shift(cell: Cell, group_height: float) -> float:
+    dy = 0.0
+    if isinstance(cell, ContentCell) and cell.valign != CellAlignment.TOP:
+        dy = cell.total_height - group_height
+        if cell.valign == CellAlignment.CENTER:
+            dy /= 2.0
+    return dy
+
+
+class LineCell(NamedTuple):
+    cell: Cell
+    offset: float
+    locked: bool
+
+
+class AppendType(enum.IntEnum):
+    FAIL = 0
+    SUCCESS = 1
+    FORCED = 2
+
+
+class AbstractLine(ContentCell):  # ABC
+    has_tab_support = False
+
+    def __init__(self, width: float):
+        super().__init__(width=width, height=0, valign=CellAlignment.BOTTOM)
+        self._cells: List[LineCell] = []
+        self._current_offset: float = 0.0
+
+    def __iter__(self):
+        return self.flatten()
+
+    @abc.abstractmethod
+    def append(self, cell: Cell) -> AppendType:
+        """Append cell to the line content and report SUCCESS or FAIL."""
+        pass
+
+    @abc.abstractmethod
+    def append_with_tab(self, cell: Cell, tab: Tabulator) -> AppendType:
+        """Append cell with preceding tabulator cell to the line content
+        and report SUCCESS or FAIL.
+        """
+        pass
+
+    @property
+    def has_content(self):
+        return bool(self._cells)
+
+    def place(self, x: float, y: float):
+        super().place(x, y)
+        group_height = self.total_height
+        for line_cell in self._cells:
+            cell = line_cell.cell
+            cx = x + line_cell.offset
+            cy = y + vertical_cell_shift(cell, group_height)
+            cell.place(cx, cy)
+
+    @property
+    def line_width(self) -> float:
+        return self._width
+
+    @property
+    def total_width(self) -> float:
+        width: float = 0.0
+        if len(self._cells):
+            last_cell = self._cells[-1]
+            width = last_cell.offset + last_cell.cell.total_width
+        return width
+
+    @property
+    def total_height(self) -> float:
+        if len(self._cells):
+            return max(c.cell.total_height for c in self._cells)
+        return 0.0
+
+    def cells(self) -> Iterable[Cell]:
+        """Yield line content including RigidConnections."""
+        return [c.cell for c in self._cells]
+
+    def flatten(self) -> Iterable[Cell]:
+        """Yield line content with resolved RigidConnections."""
+        for cell in self.cells():
+            if isinstance(cell, RigidConnection):
+                yield from cell
+            else:
+                yield cell
+
+    def render(self, m: Matrix44 = None) -> None:
+        cells = list(self.cells())
+        render_cells(cells, m)
+        render_text_strokes(cells, m)
+
+    def remove_line_breaking_space(self):
+        """Remove the last space in the line."""
+        _cells = self._cells
+        if _cells and isinstance(_cells[-1].cell, Space):
+            _cells.pop()
+
+
+class LeftLine(AbstractLine):
+    has_tab_support = True
+
+    def __init__(self, width: float, tab_stops: Sequence[TabStop] = None):
+        super().__init__(width=width)
+        self._tab_stops = tab_stops or []  # tab stops relative to line start
+
+    def _append_line_cell(
+        self, cell: Cell, offset: float, locked: bool = False
+    ) -> None:
+        self._cells.append(LineCell(cell, offset, locked))
+
+    def append(self, cell: Cell) -> AppendType:
+        width = cell.total_width
+        if self._current_offset + width <= self.line_width:
+            self._append_line_cell(cell, self._current_offset)
+            self._current_offset += width
+            return AppendType.SUCCESS
+        if len(self._cells) == 0:
+            # single cell is too wide for a line,
+            # forced rendering with oversize
+            self._append_line_cell(cell, 0)
+            return AppendType.FORCED
+        return AppendType.FAIL
+
+    def append_with_tab(self, cell: Cell, tab: Tabulator) -> AppendType:
+        width = cell.total_width
+        pos = self._current_offset
+        # does content fit into line:
+        if pos + width > self.line_width:
+            return AppendType.FAIL
+
+        # next possible tab stop location:
+        left_pos = pos
+        center_pos = pos + width / 2
+        right_pos = pos + width
+        tab_stop = self._next_tab_stop(left_pos, center_pos, right_pos)
+        if tab_stop is None:  # no tab stop found
+            self.append(tab.to_space())  # replace tabulator by space
+            return self.append(cell)
+        else:
+            if tab_stop.kind == TabStopType.LEFT:
+                return self._append_left(cell, tab_stop.pos)
+            elif tab_stop.kind == TabStopType.CENTER:
+                return self._append_center(cell, tab_stop.pos)
+            else:
+                return self._append_right(cell, tab_stop.pos)
+
+    def _append_left(self, cell, pos) -> AppendType:
+        width = cell.total_width
+        if pos + width <= self.line_width:
+            self._append_line_cell(cell, pos, True)
+            self._current_offset = pos + width
+            return AppendType.SUCCESS
+        return AppendType.FAIL
+
+    def _append_center(self, cell, pos) -> AppendType:
+        width2 = cell.total_width / 2
+        if self._current_offset + width2 > pos:
+            return self.append(cell)
+        elif pos + width2 <= self.line_width:
+            self._append_line_cell(cell, pos - width2, True)
+            self._current_offset = pos + width2
+            return AppendType.SUCCESS
+        return AppendType.FAIL
+
+    def _append_right(self, cell, pos) -> AppendType:
+        width = cell.total_width
+        end_of_cell_pos = self._current_offset + width
+        if end_of_cell_pos > self.line_width:
+            return AppendType.FAIL
+        if end_of_cell_pos > pos:
+            return self.append(cell)
+        self._append_line_cell(cell, pos - width, True)
+        self._current_offset = pos
+        return AppendType.SUCCESS
+
+    def _next_tab_stop(self, left, center, right):
+        for tab in self._tab_stops:
+            if tab.kind == TabStopType.LEFT and tab.pos > left:
+                return tab
+            elif tab.kind == TabStopType.CENTER and tab.pos > center:
+                return tab
+            elif tab.kind == TabStopType.RIGHT and tab.pos > right:
+                return tab
+        return None
+
+
+def content_width(cells: Iterable[Cell]) -> float:
+    return sum(cell.total_width for cell in cells)
+
+
+def growable_cells(cells: Iterable[Cell]) -> List[Glue]:
+    growable = []
+    for cell in cells:
+        if isinstance(cell, Glue) and cell.can_grow:
+            growable.append(cell)
+        elif isinstance(cell, RigidConnection):
+            growable.extend(cell.growable_glue())
+    return growable
+
+
+def update_offsets(cells: List[LineCell], index: int) -> None:
+    count = len(cells)
+    if count == 0 or index > count:
+        return
+
+    last_cell = cells[index - 1]
+    offset = last_cell.offset + last_cell.cell.total_width
+    while index < count:
+        cell = cells[index].cell
+        cells[index] = LineCell(cell, offset, False)
+        offset += cell.total_width
+        index += 1
+
+
+class JustifiedLine(LeftLine):
+    def distribute(self):
+        cells = self._cells
+        last_locked_cell = self._last_locked_cell()
+        if last_locked_cell == len(cells):
+            return
+
+        available_space = self._available_space(last_locked_cell)
+        cells = [c.cell for c in cells[last_locked_cell + 1 :]]
+        modified = False
+        while True:
+            growable = growable_cells(cells)
+            if len(growable) == 0:
+                break
+
+            space_to_distribute = available_space - content_width(cells)
+            if space_to_distribute <= 1e-9:
+                break
+
+            delta = space_to_distribute / len(growable)
+            for cell in growable:
+                cell.resize(cell.total_width + delta)
+            modified = True
+
+        if modified:
+            update_offsets(self._cells, last_locked_cell + 1)
+
+    def _end_offset(self, index):
+        cell = self._cells[index]
+        return cell.offset + cell.cell.total_width
+
+    def _available_space(self, index):
+        return self.line_width - self._end_offset(index)
+
+    def _last_locked_cell(self):
+        cells = self._cells
+        index = len(cells) - 1
+        while index > 0:
+            if cells[index].locked:
+                return index
+            index -= 1
+        return 0
+
+
+class NoTabLine(AbstractLine):
+    """Base class for lines without tab stop support!"""
+
+    has_tab_support = False
+
+    def append(self, cell: Cell) -> AppendType:
+        if isinstance(cell, Tabulator):
+            cell = cell.to_space()
+        width = cell.total_width
+        if self._current_offset + width < self.line_width:
+            self._cells.append(LineCell(cell, self._current_offset, False))
+            self._current_offset += width
+            return AppendType.SUCCESS
+        if len(self._cells) == 0:
+            # single cell is too wide for a line,
+            # forced rendering with oversize
+            self._cells.append(LineCell(cell, 0, False))
+            return AppendType.FORCED
+        return AppendType.FAIL
+
+    def append_with_tab(self, cell: Cell, tab: Tabulator) -> AppendType:
+        """No tabulator support!"""
+        raise NotImplementedError()
+
+    def place(self, x: float, y: float):
+        # shift the line cell:
+        super().place(x + self.start_offset(), y)
+
+    @abc.abstractmethod
+    def start_offset(self) -> float:
+        pass
+
+
+class CenterLine(NoTabLine):
+    """Right aligned lines do not support tab stops!"""
+
+    def start_offset(self) -> float:
+        real_width = sum(c.cell.total_width for c in self._cells)
+        return (self.line_width - real_width) / 2
+
+
+class RightLine(NoTabLine):
+    """Right aligned lines do not support tab stops!"""
+
+    def start_offset(self) -> float:
+        real_width = sum(c.cell.total_width for c in self._cells)
+        return self.line_width - real_width
+
+
+def shift_tab_stops(
+    tab_stops: Iterable[TabStop], offset: float, right_border: float
+) -> List[TabStop]:
+    return [
+        tab_stop
+        for tab_stop in (TabStop(pos + offset, kind) for pos, kind in tab_stops)
+        if 0 < tab_stop.pos <= right_border
+    ]

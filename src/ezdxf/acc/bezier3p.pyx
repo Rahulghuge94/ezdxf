@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 __all__ = ['Bezier3P']
 
 DEF ABS_TOL = 1e-12
+DEF REL_TOL = 1e-9
 DEF M_PI = 3.141592653589793
 DEF M_TAU = M_PI * 2.0
 DEF DEG2RAD = M_PI / 180.0
@@ -87,7 +88,7 @@ cdef class Bezier3P:
 
         while t0 < 1.0:
             t1 = t0 + dt
-            if isclose(t1, 1.0, ABS_TOL):
+            if isclose(t1, 1.0, REL_TOL, ABS_TOL):
                 end_point = (<Vec3> self.end_point).to_cpp_vec3()
                 t1 = 1.0
             else:
@@ -139,7 +140,12 @@ cdef class _Flattening:
         cdef double mid_t = (start_t + end_t) * 0.5
         cdef CppVec3 mid_point = self.curve.point(mid_t)
         cdef double d = mid_point.distance(start_point.lerp(end_point, 0.5))
-        if d < self.distance:
+        # very big numbers (>1e99) can cause calculation errors #574
+        # distance from 2.999999999999987e+99 to 2.9999999999999e+99 is
+        # very big even it is only a floating point imprecision error in the
+        # mantissa!
+        if d < self.distance or d > 1e12:  # educated guess
+            # keep in sync with CPython implementation: ezdxf/math/_bezier3p.py
             # Convert CppVec3 to Python type Vec3:
             self.points.append(v3_from_cpp_vec3(end_point))
         else:

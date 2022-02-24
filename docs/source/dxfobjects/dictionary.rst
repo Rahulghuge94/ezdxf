@@ -6,13 +6,25 @@ Dictionary
 
 The `DICTIONARY`_ is a general storage entity.
 
-AutoCAD maintains items such as MLINE_STYLES and GROUP definitions as objects in dictionaries.
-Other applications are free to create and use their own dictionaries as they see fit.
-The prefix ``'ACAD_'`` is reserved for use by AutoCAD applications.
+AutoCAD maintains items such as MLINE_STYLES and GROUP definitions as objects in
+dictionaries. Other applications are free to create and use their own
+dictionaries as they see fit. The prefix ``'ACAD_'`` is reserved for use by
+AutoCAD applications.
 
-Dictionary entries are (:attr:`key`, :class:`DXFEntity`) pairs. At loading time the value could be a ``str``,
-because at this time not all objects are already stored in the :class:`EntityDB`, and have to be acquired later.
+Dictionary entries are (key, :class:`DXFEntity`) pairs for fully loaded or
+new created DXF documents. The referenced entities are owned by the dictionary
+and cannot be graphical entities that always belong to the layout in which they
+are located.
 
+Loading DXF files is done in two passes, because at the first loading stage not
+all referenced objects are already stored in the entity database. Therefore the
+entities are stored as handles strings at the first loading stage and have to
+be replaced by the real entity at the second loading stage.
+If the entity is still a handle string after the second loading stage, the
+entity does not exist.
+
+Dictionary keys are handled case insensitive by AutoCAD, but not by `ezdxf`,
+in doubt use an uppercase key. AutoCAD stores all keys in uppercase.
 
 ======================== =============================================================
 Subclass of              :class:`ezdxf.entities.DXFObject`
@@ -22,17 +34,20 @@ Factory function         :meth:`ezdxf.sections.objects.ObjectsSection.add_dictio
 
 .. warning::
 
-    Do not instantiate object classes by yourself - always use the provided factory functions!
+    Do not instantiate object classes by yourself - always use the provided
+    factory functions!
 
 .. class:: Dictionary
 
     .. attribute:: dxf.hard_owned
 
-        If set to ``1``, indicates that elements of the dictionary are to be treated as hard-owned.
+        If set to ``1``, indicates that elements of the dictionary are to be
+        treated as hard-owned.
 
-    .. attribute:: dxf cloning
+    .. attribute:: dxf.cloning
 
-        Duplicate record cloning flag (determines how to merge duplicate entries, ignored by `ezdxf`):
+        Duplicate record cloning flag (determines how to merge duplicate entries,
+        ignored by `ezdxf`):
 
         === ==================
         0   not applicable
@@ -62,7 +77,7 @@ Factory function         :meth:`ezdxf.sections.objects.ObjectsSection.add_dictio
 
     .. automethod:: count
 
-    .. automethod:: get(key: str, default: Any = DXFKeyError) -> DXFEntity
+    .. automethod:: get(key: str, default: DXFEntity = None) -> Optional[DXFEntity]
 
     .. automethod:: add(key: str, value: DXFEntity) -> None
 
@@ -77,6 +92,10 @@ Factory function         :meth:`ezdxf.sections.objects.ObjectsSection.add_dictio
     .. automethod:: get_required_dict(key: str) -> Dictionary
 
     .. automethod:: add_dict_var(key: str, value: str) -> DictionaryVar
+
+    .. automethod:: add_xrecord(key: str) -> XRecord
+
+    .. automethod:: link_dxf_object(name: str, obj: DXFEntity) -> None
 
 
 .. _DICTIONARY: http://help.autodesk.com/view/OARX/2018/ENU/?guid=GUID-40B92C63-26F0-485B-A9C2-B349099B26D0
@@ -110,11 +129,14 @@ DXF type                 ``'DICTIONARYVAR'``
 Factory function         :meth:`ezdxf.entities.Dictionary.add_dict_var`
 ======================== =========================================================================
 
-.. attribute:: dxf.schema
+.. class:: DictionaryVar
 
-    Object schema number (currently set to ``0``)
+    .. attribute:: dxf.schema
 
-.. attribute:: dxf.value
+        Object schema number (currently set to ``0``)
 
-    Value as string.
+    .. attribute:: dxf.value
 
+        Value as string.
+
+    .. autoproperty:: value
